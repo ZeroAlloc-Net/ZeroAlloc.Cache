@@ -10,6 +10,7 @@ internal sealed record CacheModel(
     bool AnyMethodUsesHybridCache,
     bool AnyMethodUsesIMemoryCache,
     bool AnyMethodUsesIsolatedCache,      // MaxEntries > 0 on any method
+    int IsolatedCacheMaxEntries,          // SizeLimit for the isolated MemoryCache (first MaxEntries > 0)
     ImmutableArray<CachedMethodModel> CachedMethods,
     ImmutableArray<PassthroughMethodModel> PassthroughMethods,
     ImmutableArray<Diagnostic> Diagnostics

@@ -67,13 +67,20 @@ public sealed class CacheGenerator : IIncrementalGenerator
             ? symbol.Name
             : symbol.ContainingNamespace.ToDisplayString() + "." + symbol.Name;
 
+        int isolatedCacheMaxEntries = 0;
+        for (int i = 0; i < cachedMethods.Count; i++)
+        {
+            if (cachedMethods[i].EffectiveConfig.MaxEntries > 0) { isolatedCacheMaxEntries = cachedMethods[i].EffectiveConfig.MaxEntries; break; }
+        }
+
         return new CacheModel(
             ns,
             symbol.Name,
             ifaceFqn,
             cachedMethods.Exists(static m => m.EffectiveConfig.UseHybridCache),
-            cachedMethods.Exists(static m => !m.EffectiveConfig.UseHybridCache),
+            cachedMethods.Exists(static m => !m.EffectiveConfig.UseHybridCache && m.EffectiveConfig.MaxEntries == 0),
             cachedMethods.Exists(static m => m.EffectiveConfig.MaxEntries > 0),
+            isolatedCacheMaxEntries,
             System.Collections.Immutable.ImmutableArray.CreateRange(cachedMethods),
             System.Collections.Immutable.ImmutableArray.CreateRange(passthroughMethods),
             System.Collections.Immutable.ImmutableArray.CreateRange(diagnostics)

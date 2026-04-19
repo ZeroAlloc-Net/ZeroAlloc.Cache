@@ -43,8 +43,13 @@ internal static class CacheWriter
     {
         sb.AppendLine($"    private readonly {ifaceFqn} _inner;");
 
-        if (model.AnyMethodUsesIMemoryCache)
+        if (model.AnyMethodUsesIsolatedCache)
+            sb.AppendLine($"    private readonly global::Microsoft.Extensions.Caching.Memory.MemoryCache _cache =");
+        else if (model.AnyMethodUsesIMemoryCache)
             sb.AppendLine("    private readonly global::Microsoft.Extensions.Caching.Memory.IMemoryCache _cache;");
+
+        if (model.AnyMethodUsesIsolatedCache)
+            sb.AppendLine($"        new(new global::Microsoft.Extensions.Caching.Memory.MemoryCacheOptions {{ SizeLimit = {model.IsolatedCacheMaxEntries} }});");
 
         if (model.AnyMethodUsesHybridCache)
             sb.AppendLine("    private readonly global::Microsoft.Extensions.Caching.Hybrid.HybridCache _hybridCache;");
@@ -63,28 +68,37 @@ internal static class CacheWriter
 
     private static void WriteProxyConstructor(StringBuilder sb, string proxyName, string ifaceFqn, CacheModel model)
     {
-        sb.AppendLine($"    public {proxyName}(");
-        sb.AppendLine($"        {ifaceFqn} inner,");
+        bool needsIMemoryCache = model.AnyMethodUsesIMemoryCache && !model.AnyMethodUsesIsolatedCache;
+        bool needsHybridCache = model.AnyMethodUsesHybridCache;
 
-        if (model.AnyMethodUsesIMemoryCache && model.AnyMethodUsesHybridCache)
+        sb.AppendLine($"    public {proxyName}(");
+
+        if (needsIMemoryCache && needsHybridCache)
         {
+            sb.AppendLine($"        {ifaceFqn} inner,");
             sb.AppendLine("        global::Microsoft.Extensions.Caching.Memory.IMemoryCache cache,");
             sb.AppendLine("        global::Microsoft.Extensions.Caching.Hybrid.HybridCache hybridCache)");
         }
-        else if (model.AnyMethodUsesIMemoryCache)
+        else if (needsIMemoryCache)
         {
+            sb.AppendLine($"        {ifaceFqn} inner,");
             sb.AppendLine("        global::Microsoft.Extensions.Caching.Memory.IMemoryCache cache)");
+        }
+        else if (needsHybridCache)
+        {
+            sb.AppendLine($"        {ifaceFqn} inner,");
+            sb.AppendLine("        global::Microsoft.Extensions.Caching.Hybrid.HybridCache hybridCache)");
         }
         else
         {
-            sb.AppendLine("        global::Microsoft.Extensions.Caching.Hybrid.HybridCache hybridCache)");
+            sb.AppendLine($"        {ifaceFqn} inner)");
         }
 
         sb.AppendLine("    {");
         sb.AppendLine("        _inner = inner;");
-        if (model.AnyMethodUsesIMemoryCache)
+        if (needsIMemoryCache)
             sb.AppendLine("        _cache = cache;");
-        if (model.AnyMethodUsesHybridCache)
+        if (needsHybridCache)
             sb.AppendLine("        _hybridCache = hybridCache;");
         sb.AppendLine("    }");
         sb.AppendLine();
@@ -125,18 +139,31 @@ internal static class CacheWriter
         sb.AppendLine($"        if (_cache.TryGetValue(__key, out {m.InnerReturnTypeFqn}? __cached))");
         sb.AppendLine("            return __cached!;");
         sb.AppendLine($"        var __result = await _inner.{m.Name}({m.ArgumentList}).ConfigureAwait(false);");
-        if (m.EffectiveConfig.Sliding)
+        WriteCacheSetCall(sb, m);
+        sb.AppendLine("        return __result;");
+        sb.AppendLine("    }");
+        sb.AppendLine();
+    }
+
+    private static void WriteCacheSetCall(StringBuilder sb, CachedMethodModel m)
+    {
+        bool isolated = m.EffectiveConfig.MaxEntries > 0;
+        if (isolated || m.EffectiveConfig.Sliding)
         {
             sb.AppendLine($"        _cache.Set(__key, __result, new global::Microsoft.Extensions.Caching.Memory.MemoryCacheEntryOptions");
-            sb.AppendLine($"            {{ SlidingExpiration = global::System.TimeSpan.FromMilliseconds({m.EffectiveConfig.TtlMs}) }});");
+            if (m.EffectiveConfig.Sliding)
+                sb.Append($"            {{ SlidingExpiration = global::System.TimeSpan.FromMilliseconds({m.EffectiveConfig.TtlMs})");
+            else
+                sb.Append($"            {{ AbsoluteExpirationRelativeToNow = global::System.TimeSpan.FromMilliseconds({m.EffectiveConfig.TtlMs})");
+            if (isolated)
+                sb.AppendLine(", Size = 1 });");
+            else
+                sb.AppendLine(" });");
         }
         else
         {
             sb.AppendLine($"        _cache.Set(__key, __result, global::System.TimeSpan.FromMilliseconds({m.EffectiveConfig.TtlMs}));");
         }
-        sb.AppendLine("        return __result;");
-        sb.AppendLine("    }");
-        sb.AppendLine();
     }
 
     private static void WriteHybridCachedMethod(StringBuilder sb, string interfaceName, CachedMethodModel m)
@@ -203,6 +230,7 @@ internal static class CacheWriter
 
         bool anyIMemoryCache = model.AnyMethodUsesIMemoryCache;
         bool anyHybridCache = model.AnyMethodUsesHybridCache;
+        bool anyIsolated = model.AnyMethodUsesIsolatedCache;
 
         sb.AppendLine("public static partial class CacheServiceCollectionExtensions");
         sb.AppendLine("{");
@@ -210,22 +238,34 @@ internal static class CacheWriter
         sb.AppendLine("        this global::Microsoft.Extensions.DependencyInjection.IServiceCollection services)");
         sb.AppendLine($"        where TImpl : class, {ifaceFqn}");
         sb.AppendLine("    {");
-        if (anyIMemoryCache)
+        if (anyIMemoryCache && !anyIsolated)
             sb.AppendLine("        services.AddMemoryCache();");
         if (anyHybridCache)
             sb.AppendLine("        services.AddHybridCache();");
         sb.AppendLine("        services.AddTransient<TImpl>();");
         sb.AppendLine($"        services.AddTransient<{ifaceFqn}>(sp =>");
-        sb.AppendLine($"            new {proxyName}(");
-        sb.AppendLine("                sp.GetRequiredService<TImpl>(),");
-        WriteDiExtensionServiceArgs(sb, anyIMemoryCache, anyHybridCache);
+        WriteDiExtensionProxyCreation(sb, proxyName, anyIMemoryCache, anyHybridCache, anyIsolated);
         sb.AppendLine("        return services;");
         sb.AppendLine("    }");
         sb.AppendLine("}");
     }
 
-    private static void WriteDiExtensionServiceArgs(StringBuilder sb, bool anyIMemoryCache, bool anyHybridCache)
+    private static void WriteDiExtensionProxyCreation(
+        StringBuilder sb,
+        string proxyName,
+        bool anyIMemoryCache,
+        bool anyHybridCache,
+        bool anyIsolated)
     {
+        if (anyIsolated && !anyHybridCache)
+        {
+            sb.AppendLine($"            new {proxyName}(sp.GetRequiredService<TImpl>()));");
+            return;
+        }
+
+        sb.AppendLine($"            new {proxyName}(");
+        sb.AppendLine("                sp.GetRequiredService<TImpl>(),");
+
         if (anyIMemoryCache && anyHybridCache)
         {
             sb.AppendLine("                sp.GetRequiredService<global::Microsoft.Extensions.Caching.Memory.IMemoryCache>(),");
