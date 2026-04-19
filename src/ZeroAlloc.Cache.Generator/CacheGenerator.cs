@@ -18,10 +18,15 @@ public sealed class CacheGenerator : IIncrementalGenerator
 
         context.RegisterSourceOutput(models, static (ctx, model) =>
         {
+            var hasErrors = false;
             foreach (var d in model.Diagnostics)
+            {
                 ctx.ReportDiagnostic(d);
+                if (d.Severity == Microsoft.CodeAnalysis.DiagnosticSeverity.Error)
+                    hasErrors = true;
+            }
 
-            if (model.CachedMethods.Length > 0 || model.PassthroughMethods.Length > 0)
+            if (!hasErrors && (model.CachedMethods.Length > 0 || model.PassthroughMethods.Length > 0))
                 CacheWriter.Write(ctx, model);
         });
     }
@@ -30,6 +35,7 @@ public sealed class CacheGenerator : IIncrementalGenerator
         GeneratorSyntaxContext ctx,
         System.Threading.CancellationToken ct)
     {
+        ct.ThrowIfCancellationRequested();
         // Implement in Task 4
         return null;
     }
