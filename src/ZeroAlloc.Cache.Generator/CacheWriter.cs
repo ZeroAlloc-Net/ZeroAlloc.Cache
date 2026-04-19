@@ -125,7 +125,15 @@ internal static class CacheWriter
         sb.AppendLine($"        if (_cache.TryGetValue(__key, out {m.InnerReturnTypeFqn}? __cached))");
         sb.AppendLine("            return __cached!;");
         sb.AppendLine($"        var __result = await _inner.{m.Name}({m.ArgumentList}).ConfigureAwait(false);");
-        sb.AppendLine($"        _cache.Set(__key, __result, global::System.TimeSpan.FromMilliseconds({m.EffectiveConfig.TtlMs}));");
+        if (m.EffectiveConfig.Sliding)
+        {
+            sb.AppendLine($"        _cache.Set(__key, __result, new global::Microsoft.Extensions.Caching.Memory.MemoryCacheEntryOptions");
+            sb.AppendLine($"            {{ SlidingExpiration = global::System.TimeSpan.FromMilliseconds({m.EffectiveConfig.TtlMs}) }});");
+        }
+        else
+        {
+            sb.AppendLine($"        _cache.Set(__key, __result, global::System.TimeSpan.FromMilliseconds({m.EffectiveConfig.TtlMs}));");
+        }
         sb.AppendLine("        return __result;");
         sb.AppendLine("    }");
         sb.AppendLine();

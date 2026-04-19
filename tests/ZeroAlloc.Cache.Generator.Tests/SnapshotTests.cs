@@ -89,4 +89,21 @@ public sealed class SnapshotTests
             """;
         return TestHelper.Verify(source);
     }
+
+    [Fact]
+    public Task Sliding_IMemoryCache_UsesMemoryCacheEntryOptions()
+    {
+        const string source = """
+            using ZeroAlloc.Cache;
+            using System.Threading;
+            using System.Threading.Tasks;
+            namespace T;
+            [Cache(TtlMs = 30_000, Sliding = true)]
+            public interface IMyService
+            {
+                ValueTask<string> GetAsync(string id, CancellationToken ct);
+            }
+            """;
+        return TestHelper.Verify(source);
+    }
 }
