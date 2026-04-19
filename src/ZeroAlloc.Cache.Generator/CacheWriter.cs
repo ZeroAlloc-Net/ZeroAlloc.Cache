@@ -1,3 +1,4 @@
+using System.Linq;
 using System.Text;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.Text;
@@ -36,6 +37,63 @@ internal static class CacheWriter
         ctx.AddSource(hint, SourceText.From(sb.ToString(), Encoding.UTF8));
     }
 
+    private static string OptionsFieldName(string methodName) =>
+        $"_{char.ToLowerInvariant(methodName[0])}{methodName.Substring(1)}Options";
+
+    private static void WriteProxyFields(StringBuilder sb, string ifaceFqn, CacheModel model)
+    {
+        sb.AppendLine($"    private readonly {ifaceFqn} _inner;");
+
+        bool anyIMemoryCache = model.CachedMethods.Any(static m => !m.EffectiveConfig.UseHybridCache);
+        if (anyIMemoryCache)
+            sb.AppendLine("    private readonly global::Microsoft.Extensions.Caching.Memory.IMemoryCache _cache;");
+
+        if (model.AnyMethodUsesHybridCache)
+            sb.AppendLine("    private readonly global::Microsoft.Extensions.Caching.Hybrid.HybridCache _hybridCache;");
+
+        sb.AppendLine();
+
+        foreach (var m in model.CachedMethods)
+        {
+            if (!m.EffectiveConfig.UseHybridCache) continue;
+            var fieldName = OptionsFieldName(m.Name);
+            sb.AppendLine($"    private static readonly global::Microsoft.Extensions.Caching.Hybrid.HybridCacheEntryOptions {fieldName} =");
+            sb.AppendLine($"        new() {{ Expiration = global::System.TimeSpan.FromMilliseconds({m.EffectiveConfig.TtlMs}) }};");
+            sb.AppendLine();
+        }
+    }
+
+    private static void WriteProxyConstructor(StringBuilder sb, string proxyName, string ifaceFqn, CacheModel model)
+    {
+        bool anyIMemoryCache = model.CachedMethods.Any(static m => !m.EffectiveConfig.UseHybridCache);
+
+        sb.AppendLine($"    public {proxyName}(");
+        sb.AppendLine($"        {ifaceFqn} inner,");
+
+        if (anyIMemoryCache && model.AnyMethodUsesHybridCache)
+        {
+            sb.AppendLine("        global::Microsoft.Extensions.Caching.Memory.IMemoryCache cache,");
+            sb.AppendLine("        global::Microsoft.Extensions.Caching.Hybrid.HybridCache hybridCache)");
+        }
+        else if (anyIMemoryCache)
+        {
+            sb.AppendLine("        global::Microsoft.Extensions.Caching.Memory.IMemoryCache cache)");
+        }
+        else
+        {
+            sb.AppendLine("        global::Microsoft.Extensions.Caching.Hybrid.HybridCache hybridCache)");
+        }
+
+        sb.AppendLine("    {");
+        sb.AppendLine("        _inner = inner;");
+        if (anyIMemoryCache)
+            sb.AppendLine("        _cache = cache;");
+        if (model.AnyMethodUsesHybridCache)
+            sb.AppendLine("        _hybridCache = hybridCache;");
+        sb.AppendLine("    }");
+        sb.AppendLine();
+    }
+
     private static void WriteProxy(StringBuilder sb, CacheModel model)
     {
         var proxyName = $"{model.InterfaceName}CacheProxy";
@@ -44,24 +102,17 @@ internal static class CacheWriter
         sb.AppendLine($"internal sealed class {proxyName} : {ifaceFqn}");
         sb.AppendLine("{");
 
-        // Fields
-        sb.AppendLine($"    private readonly {ifaceFqn} _inner;");
-        sb.AppendLine("    private readonly global::Microsoft.Extensions.Caching.Memory.IMemoryCache _cache;");
-        sb.AppendLine();
-
-        // Constructor
-        sb.AppendLine($"    public {proxyName}(");
-        sb.AppendLine($"        {ifaceFqn} inner,");
-        sb.AppendLine("        global::Microsoft.Extensions.Caching.Memory.IMemoryCache cache)");
-        sb.AppendLine("    {");
-        sb.AppendLine("        _inner = inner;");
-        sb.AppendLine("        _cache = cache;");
-        sb.AppendLine("    }");
-        sb.AppendLine();
+        WriteProxyFields(sb, ifaceFqn, model);
+        WriteProxyConstructor(sb, proxyName, ifaceFqn, model);
 
         // Cached methods
         foreach (var m in model.CachedMethods)
-            WriteCachedMethod(sb, model.InterfaceName, m);
+        {
+            if (m.EffectiveConfig.UseHybridCache)
+                WriteHybridCachedMethod(sb, model.InterfaceName, m);
+            else
+                WriteCachedMethod(sb, model.InterfaceName, m);
+        }
 
         // Passthrough methods
         foreach (var m in model.PassthroughMethods)
@@ -84,6 +135,41 @@ internal static class CacheWriter
         sb.AppendLine();
     }
 
+    private static void WriteHybridCachedMethod(StringBuilder sb, string interfaceName, CachedMethodModel m)
+    {
+        var fieldName = OptionsFieldName(m.Name);
+
+        string state;
+        string lambda;
+        if (m.KeyParams.IsEmpty)
+        {
+            state = "_inner";
+            lambda = $"static async (inner, ct) => await inner.{m.Name}(ct).ConfigureAwait(false)";
+        }
+        else
+        {
+            var paramNames = string.Join(", ", m.KeyParams.Select(p => p.Name));
+            state = $"(inner: _inner, {paramNames})";
+            var lambdaArgs = string.Join(", ", m.KeyParams.Select(p => $"s.{p.Name}"));
+            if (m.HasCancellationToken)
+                lambdaArgs += ", ct";
+            lambda = $"static async (s, ct) => await s.inner.{m.Name}({lambdaArgs}).ConfigureAwait(false)";
+        }
+
+        var ctArg = m.HasCancellationToken ? m.CancellationTokenParamName : "default";
+
+        sb.AppendLine($"    public {m.ReturnTypeFqn} {m.Name}({m.ParameterList})");
+        sb.AppendLine("    {");
+        sb.AppendLine("        return _hybridCache.GetOrCreateAsync(");
+        sb.AppendLine($"            $\"{interfaceName}.{m.Name}{m.KeyArguments}\",");
+        sb.AppendLine($"            {state},");
+        sb.AppendLine($"            {lambda},");
+        sb.AppendLine($"            {fieldName},");
+        sb.AppendLine($"            cancellationToken: {ctArg});");
+        sb.AppendLine("    }");
+        sb.AppendLine();
+    }
+
     private static void WritePassthroughMethod(StringBuilder sb, PassthroughMethodModel m)
     {
         sb.AppendLine($"    public {m.ReturnTypeFqn} {m.Name}({m.ParameterList})");
@@ -97,20 +183,43 @@ internal static class CacheWriter
         var proxyName = $"{model.InterfaceName}CacheProxy";
         var methodName = $"Add{model.InterfaceName.TrimStart('I')}Cache";
 
+        bool anyIMemoryCache = model.CachedMethods.Any(static m => !m.EffectiveConfig.UseHybridCache);
+        bool anyHybridCache = model.AnyMethodUsesHybridCache;
+
         sb.AppendLine("public static partial class CacheServiceCollectionExtensions");
         sb.AppendLine("{");
         sb.AppendLine($"    public static global::Microsoft.Extensions.DependencyInjection.IServiceCollection {methodName}<TImpl>(");
         sb.AppendLine("        this global::Microsoft.Extensions.DependencyInjection.IServiceCollection services)");
         sb.AppendLine($"        where TImpl : class, {ifaceFqn}");
         sb.AppendLine("    {");
-        sb.AppendLine("        services.AddMemoryCache();");
+        if (anyIMemoryCache)
+            sb.AppendLine("        services.AddMemoryCache();");
+        if (anyHybridCache)
+            sb.AppendLine("        services.AddHybridCache();");
         sb.AppendLine("        services.AddTransient<TImpl>();");
         sb.AppendLine($"        services.AddTransient<{ifaceFqn}>(sp =>");
         sb.AppendLine($"            new {proxyName}(");
         sb.AppendLine("                sp.GetRequiredService<TImpl>(),");
-        sb.AppendLine("                sp.GetRequiredService<global::Microsoft.Extensions.Caching.Memory.IMemoryCache>()));");
+        WriteDiExtensionServiceArgs(sb, anyIMemoryCache, anyHybridCache);
         sb.AppendLine("        return services;");
         sb.AppendLine("    }");
         sb.AppendLine("}");
+    }
+
+    private static void WriteDiExtensionServiceArgs(StringBuilder sb, bool anyIMemoryCache, bool anyHybridCache)
+    {
+        if (anyIMemoryCache && anyHybridCache)
+        {
+            sb.AppendLine("                sp.GetRequiredService<global::Microsoft.Extensions.Caching.Memory.IMemoryCache>(),");
+            sb.AppendLine("                sp.GetRequiredService<global::Microsoft.Extensions.Caching.Hybrid.HybridCache>()));");
+        }
+        else if (anyIMemoryCache)
+        {
+            sb.AppendLine("                sp.GetRequiredService<global::Microsoft.Extensions.Caching.Memory.IMemoryCache>()));");
+        }
+        else
+        {
+            sb.AppendLine("                sp.GetRequiredService<global::Microsoft.Extensions.Caching.Hybrid.HybridCache>()));");
+        }
     }
 }
