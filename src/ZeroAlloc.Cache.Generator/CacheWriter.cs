@@ -1,4 +1,3 @@
-using System.Linq;
 using System.Text;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.Text;
@@ -44,8 +43,7 @@ internal static class CacheWriter
     {
         sb.AppendLine($"    private readonly {ifaceFqn} _inner;");
 
-        bool anyIMemoryCache = model.CachedMethods.Any(static m => !m.EffectiveConfig.UseHybridCache);
-        if (anyIMemoryCache)
+        if (model.AnyMethodUsesIMemoryCache)
             sb.AppendLine("    private readonly global::Microsoft.Extensions.Caching.Memory.IMemoryCache _cache;");
 
         if (model.AnyMethodUsesHybridCache)
@@ -65,17 +63,15 @@ internal static class CacheWriter
 
     private static void WriteProxyConstructor(StringBuilder sb, string proxyName, string ifaceFqn, CacheModel model)
     {
-        bool anyIMemoryCache = model.CachedMethods.Any(static m => !m.EffectiveConfig.UseHybridCache);
-
         sb.AppendLine($"    public {proxyName}(");
         sb.AppendLine($"        {ifaceFqn} inner,");
 
-        if (anyIMemoryCache && model.AnyMethodUsesHybridCache)
+        if (model.AnyMethodUsesIMemoryCache && model.AnyMethodUsesHybridCache)
         {
             sb.AppendLine("        global::Microsoft.Extensions.Caching.Memory.IMemoryCache cache,");
             sb.AppendLine("        global::Microsoft.Extensions.Caching.Hybrid.HybridCache hybridCache)");
         }
-        else if (anyIMemoryCache)
+        else if (model.AnyMethodUsesIMemoryCache)
         {
             sb.AppendLine("        global::Microsoft.Extensions.Caching.Memory.IMemoryCache cache)");
         }
@@ -86,7 +82,7 @@ internal static class CacheWriter
 
         sb.AppendLine("    {");
         sb.AppendLine("        _inner = inner;");
-        if (anyIMemoryCache)
+        if (model.AnyMethodUsesIMemoryCache)
             sb.AppendLine("        _cache = cache;");
         if (model.AnyMethodUsesHybridCache)
             sb.AppendLine("        _hybridCache = hybridCache;");
@@ -139,41 +135,35 @@ internal static class CacheWriter
     {
         var fieldName = OptionsFieldName(m.Name);
 
+        var ctName = m.CancellationTokenParamName ?? "ct";
+
         string state;
         string lambda;
         if (m.KeyParams.IsEmpty)
         {
             state = "_inner";
-            lambda = $"static async (inner, ct) => await inner.{m.Name}(ct).ConfigureAwait(false)";
+            lambda = $"static async (inner, {ctName}) => await inner.{m.Name}({ctName}).ConfigureAwait(false)";
         }
         else
         {
-            var paramSb2 = new System.Text.StringBuilder();
-            bool firstKp = true;
-            foreach (var kp in m.KeyParams)
-            {
-                if (!firstKp) paramSb2.Append(", ");
-                firstKp = false;
-                paramSb2.Append(kp.Name).Append(": ").Append(kp.Name);
-            }
-            var paramNames = paramSb2.ToString();
-            state = $"(inner: _inner, {paramNames})";
-
+            var combinedSb = new System.Text.StringBuilder();
             var lambdaSb = new System.Text.StringBuilder();
-            bool firstLa = true;
+            bool first = true;
             foreach (var kp in m.KeyParams)
             {
-                if (!firstLa) lambdaSb.Append(", ");
-                firstLa = false;
+                if (!first) { combinedSb.Append(", "); lambdaSb.Append(", "); }
+                first = false;
+                combinedSb.Append(kp.Name).Append(": ").Append(kp.Name);
                 lambdaSb.Append("s.").Append(kp.Name);
             }
+            state = $"(inner: _inner, {combinedSb})";
+
             if (m.HasCancellationToken)
             {
-                if (!firstLa) lambdaSb.Append(", ");
-                lambdaSb.Append("ct");
+                if (!first) lambdaSb.Append(", ");
+                lambdaSb.Append(ctName);
             }
-            var lambdaArgs = lambdaSb.ToString();
-            lambda = $"static async (s, ct) => await s.inner.{m.Name}({lambdaArgs}).ConfigureAwait(false)";
+            lambda = $"static async (s, {ctName}) => await s.inner.{m.Name}({lambdaSb}).ConfigureAwait(false)";
         }
 
         var ctArg = m.HasCancellationToken ? m.CancellationTokenParamName : "default";
@@ -203,7 +193,7 @@ internal static class CacheWriter
         var proxyName = $"{model.InterfaceName}CacheProxy";
         var methodName = $"Add{model.InterfaceName.TrimStart('I')}Cache";
 
-        bool anyIMemoryCache = model.CachedMethods.Any(static m => !m.EffectiveConfig.UseHybridCache);
+        bool anyIMemoryCache = model.AnyMethodUsesIMemoryCache;
         bool anyHybridCache = model.AnyMethodUsesHybridCache;
 
         sb.AppendLine("public static partial class CacheServiceCollectionExtensions");

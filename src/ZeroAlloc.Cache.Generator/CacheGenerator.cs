@@ -72,6 +72,7 @@ public sealed class CacheGenerator : IIncrementalGenerator
             symbol.Name,
             ifaceFqn,
             cachedMethods.Exists(static m => m.EffectiveConfig.UseHybridCache),
+            cachedMethods.Exists(static m => !m.EffectiveConfig.UseHybridCache),
             cachedMethods.Exists(static m => m.EffectiveConfig.MaxEntries > 0),
             System.Collections.Immutable.ImmutableArray.CreateRange(cachedMethods),
             System.Collections.Immutable.ImmutableArray.CreateRange(passthroughMethods),

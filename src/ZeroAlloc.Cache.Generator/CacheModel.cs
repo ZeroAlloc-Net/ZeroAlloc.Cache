@@ -8,6 +8,7 @@ internal sealed record CacheModel(
     string InterfaceName,
     string InterfaceFqn,
     bool AnyMethodUsesHybridCache,
+    bool AnyMethodUsesIMemoryCache,
     bool AnyMethodUsesIsolatedCache,      // MaxEntries > 0 on any method
     ImmutableArray<CachedMethodModel> CachedMethods,
     ImmutableArray<PassthroughMethodModel> PassthroughMethods,
