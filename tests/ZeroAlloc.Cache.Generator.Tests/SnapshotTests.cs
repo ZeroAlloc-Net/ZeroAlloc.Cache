@@ -74,4 +74,19 @@ public sealed class SnapshotTests
             """;
         return TestHelper.Verify(source);
     }
+
+    [Fact]
+    public Task UseHybridCache_NoParams_GeneratesHybridProxy()
+    {
+        const string source = """
+            using ZeroAlloc.Cache;
+            namespace T;
+            [Cache(TtlMs = 1000, UseHybridCache = true)]
+            public interface IMyService
+            {
+                System.Threading.Tasks.ValueTask<string> GetAsync(System.Threading.CancellationToken ct);
+            }
+            """;
+        return TestHelper.Verify(source);
+    }
 }

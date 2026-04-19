@@ -10,7 +10,7 @@ internal sealed class IMyServiceCacheProxy : global::T.IMyService
     private readonly global::Microsoft.Extensions.Caching.Hybrid.HybridCache _hybridCache;
 
     private static readonly global::Microsoft.Extensions.Caching.Hybrid.HybridCacheEntryOptions _getAsyncOptions =
-        new() { Expiration = global::System.TimeSpan.FromMilliseconds(30000) };
+        new() { Expiration = global::System.TimeSpan.FromMilliseconds(1000) };
 
     public IMyServiceCacheProxy(
         global::T.IMyService inner,
@@ -20,12 +20,12 @@ internal sealed class IMyServiceCacheProxy : global::T.IMyService
         _hybridCache = hybridCache;
     }
 
-    public global::System.Threading.Tasks.ValueTask<string> GetAsync(string id, global::System.Threading.CancellationToken ct)
+    public global::System.Threading.Tasks.ValueTask<string> GetAsync(global::System.Threading.CancellationToken ct)
     {
         return _hybridCache.GetOrCreateAsync(
-            $"IMyService.GetAsync:{id}",
-            (inner: _inner, id: id),
-            static async (s, ct) => await s.inner.GetAsync(s.id, ct).ConfigureAwait(false),
+            $"IMyService.GetAsync",
+            _inner,
+            static async (inner, ct) => await inner.GetAsync(ct).ConfigureAwait(false),
             _getAsyncOptions,
             cancellationToken: ct);
     }

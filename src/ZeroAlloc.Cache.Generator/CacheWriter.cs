@@ -148,11 +148,31 @@ internal static class CacheWriter
         }
         else
         {
-            var paramNames = string.Join(", ", m.KeyParams.Select(p => p.Name));
+            var paramSb2 = new System.Text.StringBuilder();
+            bool firstKp = true;
+            foreach (var kp in m.KeyParams)
+            {
+                if (!firstKp) paramSb2.Append(", ");
+                firstKp = false;
+                paramSb2.Append(kp.Name).Append(": ").Append(kp.Name);
+            }
+            var paramNames = paramSb2.ToString();
             state = $"(inner: _inner, {paramNames})";
-            var lambdaArgs = string.Join(", ", m.KeyParams.Select(p => $"s.{p.Name}"));
+
+            var lambdaSb = new System.Text.StringBuilder();
+            bool firstLa = true;
+            foreach (var kp in m.KeyParams)
+            {
+                if (!firstLa) lambdaSb.Append(", ");
+                firstLa = false;
+                lambdaSb.Append("s.").Append(kp.Name);
+            }
             if (m.HasCancellationToken)
-                lambdaArgs += ", ct";
+            {
+                if (!firstLa) lambdaSb.Append(", ");
+                lambdaSb.Append("ct");
+            }
+            var lambdaArgs = lambdaSb.ToString();
             lambda = $"static async (s, ct) => await s.inner.{m.Name}({lambdaArgs}).ConfigureAwait(false)";
         }
 
