@@ -169,16 +169,9 @@ public sealed class CacheGenerator : IIncrementalGenerator
         string paramList,
         string argList)
     {
-        var returnFqn = method.ReturnType.ToDisplayString(
-            Microsoft.CodeAnalysis.SymbolDisplayFormat.FullyQualifiedFormat);
-        bool isAsync = returnFqn.StartsWith("global::System.Threading.Tasks.ValueTask",
-                           System.StringComparison.Ordinal)
-                    || returnFqn.StartsWith("global::System.Threading.Tasks.Task",
-                           System.StringComparison.Ordinal);
         passthroughMethods.Add(new PassthroughMethodModel(
             method.Name,
             method.ReturnType.ToDisplayString(Microsoft.CodeAnalysis.SymbolDisplayFormat.FullyQualifiedFormat),
-            isAsync,
             paramList,
             argList
         ));
