@@ -56,18 +56,21 @@ public sealed class CacheGenerator : IIncrementalGenerator
             ParseMember(member, ifaceConfig, cachedMethods, passthroughMethods, diagnostics);
         }
 
-        if (cachedMethods.Count == 0 && passthroughMethods.Count == 0 && ifaceConfig == null)
+        if (cachedMethods.Count == 0 && passthroughMethods.Count == 0 && diagnostics.Count == 0)
             return null;
 
         var ns = symbol.ContainingNamespace.IsGlobalNamespace
             ? null
             : symbol.ContainingNamespace.ToDisplayString();
 
+        var ifaceFqn = symbol.ContainingNamespace.IsGlobalNamespace
+            ? symbol.Name
+            : symbol.ContainingNamespace.ToDisplayString() + "." + symbol.Name;
+
         return new CacheModel(
             ns,
             symbol.Name,
-            symbol.ToDisplayString(Microsoft.CodeAnalysis.SymbolDisplayFormat.FullyQualifiedFormat)
-                  .Replace("global::", ""),
+            ifaceFqn,
             cachedMethods.Exists(static m => m.EffectiveConfig.UseHybridCache),
             cachedMethods.Exists(static m => m.EffectiveConfig.MaxEntries > 0),
             System.Collections.Immutable.ImmutableArray.CreateRange(cachedMethods),
@@ -166,9 +169,12 @@ public sealed class CacheGenerator : IIncrementalGenerator
         string paramList,
         string argList)
     {
-        var returnDisplay = method.ReturnType.ToDisplayString();
-        bool isAsync = returnDisplay.StartsWith("System.Threading.Tasks.ValueTask", System.StringComparison.Ordinal)
-                    || returnDisplay.StartsWith("System.Threading.Tasks.Task", System.StringComparison.Ordinal);
+        var returnFqn = method.ReturnType.ToDisplayString(
+            Microsoft.CodeAnalysis.SymbolDisplayFormat.FullyQualifiedFormat);
+        bool isAsync = returnFqn.StartsWith("global::System.Threading.Tasks.ValueTask",
+                           System.StringComparison.Ordinal)
+                    || returnFqn.StartsWith("global::System.Threading.Tasks.Task",
+                           System.StringComparison.Ordinal);
         passthroughMethods.Add(new PassthroughMethodModel(
             method.Name,
             method.ReturnType.ToDisplayString(Microsoft.CodeAnalysis.SymbolDisplayFormat.FullyQualifiedFormat),
@@ -199,7 +205,9 @@ public sealed class CacheGenerator : IIncrementalGenerator
                 method.Name));
         }
 
+#pragma warning disable HLQ012 // CollectionsMarshal.AsSpan not available on netstandard2.0
         foreach (var kp in keyParams)
+#pragma warning restore HLQ012
         {
             if (kp.IsReferenceType)
             {
@@ -281,6 +289,6 @@ public sealed class CacheGenerator : IIncrementalGenerator
             }
         }
 
-        return ttlMs > 0 ? new CacheConfig(ttlMs, sliding, maxEntries, useHybridCache) : null;
+        return new CacheConfig(ttlMs, sliding, maxEntries, useHybridCache);
     }
 }
