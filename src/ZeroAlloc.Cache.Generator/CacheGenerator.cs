@@ -67,6 +67,8 @@ public sealed class CacheGenerator : IIncrementalGenerator
             ? symbol.Name
             : symbol.ContainingNamespace.ToDisplayString() + "." + symbol.Name;
 
+        // v1: all isolated methods share a single MemoryCache with SizeLimit = first MaxEntries > 0 value.
+        // Mixed MaxEntries values on the same interface are silently normalized to the first.
         int isolatedCacheMaxEntries = 0;
         for (int i = 0; i < cachedMethods.Count; i++)
         {
@@ -296,6 +298,8 @@ public sealed class CacheGenerator : IIncrementalGenerator
                 case "UseHybridCache": useHybridCache = (bool)kv.Value.Value!; break;
             }
         }
+
+        if (ttlMs <= 0) return null; // guard: TtlMs is required; malformed attribute data treated as no-cache
 
         return new CacheConfig(ttlMs, sliding, maxEntries, useHybridCache);
     }
