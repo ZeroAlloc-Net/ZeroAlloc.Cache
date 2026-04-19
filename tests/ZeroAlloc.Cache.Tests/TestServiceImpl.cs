@@ -13,5 +13,11 @@ public class TestServiceImpl : ITestService
         return ValueTask.FromResult($"result-{id}");
     }
 
-    public ValueTask SaveAsync(string data, CancellationToken ct) => ValueTask.CompletedTask;
+    public int SaveCallCount { get; private set; }
+
+    public ValueTask SaveAsync(string data, CancellationToken ct)
+    {
+        SaveCallCount++;
+        return ValueTask.CompletedTask;
+    }
 }

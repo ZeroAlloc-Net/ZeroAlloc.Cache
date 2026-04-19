@@ -48,7 +48,8 @@ public sealed class IMemoryCacheProxyTests : IDisposable
     public async Task PassthroughMethod_AlwaysCallsInner()
     {
         await _proxy.SaveAsync("data", CancellationToken.None);
-        // If proxy were broken (tried to cache ValueTask without T), it would throw
+        _impl.SaveCallCount.Should().Be(1);
+        _impl.CallCount.Should().Be(0); // GetAsync not called
     }
 
     [Fact]
