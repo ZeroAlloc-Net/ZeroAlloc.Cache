@@ -3,11 +3,20 @@
     <TargetFrameworks>net8.0;net9.0;net10.0</TargetFrameworks>
     <PackageId>ZeroAlloc.Cache</PackageId>
     <IsAotCompatible>true</IsAotCompatible>
+    <Description>Source-generated zero-allocation caching proxy for .NET interfaces.</Description>
+    <Version>0.0.0-local</Version>
+    <GeneratePackageOnBuild>false</GeneratePackageOnBuild>
   </PropertyGroup>
-  <ItemGroup>
+  <ItemGroup Condition="'$(TargetFramework)' == 'net8.0'">
+    <PackageReference Include="Microsoft.Extensions.Caching.Memory" Version="8.0.1" />
+    <PackageReference Include="Microsoft.Extensions.DependencyInjection.Abstractions" Version="8.0.2" />
+  </ItemGroup>
+  <ItemGroup Condition="'$(TargetFramework)' != 'net8.0'">
     <PackageReference Include="Microsoft.Extensions.Caching.Memory" Version="9.0.3" />
-    <PackageReference Include="Microsoft.Extensions.Caching.Hybrid" Version="9.3.0" />
     <PackageReference Include="Microsoft.Extensions.DependencyInjection.Abstractions" Version="9.0.3" />
+    <PackageReference Include="Microsoft.Extensions.Caching.Hybrid" Version="9.3.0" />
+  </ItemGroup>
+  <ItemGroup>
     <ProjectReference
       Include="..\ZeroAlloc.Cache.Generator\ZeroAlloc.Cache.Generator.csproj"
       OutputItemType="Analyzer"
