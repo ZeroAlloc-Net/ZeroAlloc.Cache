@@ -15,6 +15,14 @@ internal static class CacheWriter
         sb.AppendLine("#nullable enable");
         sb.AppendLine();
 
+        // Usings required by extension methods used in the proxy body
+        if (model.AnyMethodUsesIMemoryCache || model.AnyMethodUsesIsolatedCache)
+        {
+            sb.AppendLine("using Microsoft.Extensions.Caching.Memory;");
+            sb.AppendLine("using Microsoft.Extensions.DependencyInjection;");
+            sb.AppendLine();
+        }
+
         // Namespace
         if (model.Namespace != null)
         {

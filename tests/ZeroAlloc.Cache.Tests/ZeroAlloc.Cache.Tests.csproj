@@ -9,6 +9,7 @@
     <PackageReference Include="xunit.runner.visualstudio" Version="2.8.2" PrivateAssets="all" />
     <PackageReference Include="FluentAssertions" Version="6.12.0" />
     <PackageReference Include="Microsoft.Extensions.DependencyInjection" Version="8.0.1" />
+    <PackageReference Include="Microsoft.Extensions.Caching.Memory" Version="9.0.3" />
     <ProjectReference Include="..\..\src\ZeroAlloc.Cache\ZeroAlloc.Cache.csproj" />
     <ProjectReference
       Include="..\..\src\ZeroAlloc.Cache.Generator\ZeroAlloc.Cache.Generator.csproj"
