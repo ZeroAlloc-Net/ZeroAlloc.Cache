@@ -123,4 +123,23 @@ public sealed class SnapshotTests
             """;
         return TestHelper.Verify(source);
     }
+
+    [Fact]
+    public Task MaxEntries_WithHybridCache_MixedMethods()
+    {
+        const string source = """
+            using ZeroAlloc.Cache;
+            using System.Threading;
+            using System.Threading.Tasks;
+            namespace T;
+            [Cache(TtlMs = 30_000, MaxEntries = 500)]
+            public interface IMyService
+            {
+                ValueTask<string> GetAsync(string id, CancellationToken ct);
+                [Cache(TtlMs = 10_000, UseHybridCache = true)]
+                ValueTask<string> FindAsync(string query, CancellationToken ct);
+            }
+            """;
+        return TestHelper.Verify(source);
+    }
 }
