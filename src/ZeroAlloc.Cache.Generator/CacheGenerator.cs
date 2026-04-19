@@ -98,14 +98,20 @@ public sealed class CacheGenerator : IIncrementalGenerator
         BuildParamStrings(method, out var paramList, out var argList, out var nonCtArgList,
             out var keyArgs, out var hasCt, out var ctParamName, out var keyParams);
 
-        if (effectiveConfig == null)
+        // A method is passthrough if there is no effective config, OR if it has no
+        // method-level [Cache] and its return type is non-generic (e.g. ValueTask, Task)
+        // — there is no cacheable value to store in that case.
+        bool isNonGenericReturn = method.ReturnType is not INamedTypeSymbol { IsGenericType: true };
+        bool isPassthrough = effectiveConfig == null || (methodConfig == null && isNonGenericReturn);
+
+        if (isPassthrough)
         {
             AddPassthrough(method, passthroughMethods, paramList, argList);
             return;
         }
 
-        EmitDiagnostics(method, effectiveConfig, keyParams, diagnostics);
-        AddCachedMethod(method, effectiveConfig, paramList, argList, nonCtArgList, keyArgs,
+        EmitDiagnostics(method, effectiveConfig!, keyParams, diagnostics);
+        AddCachedMethod(method, effectiveConfig!, paramList, argList, nonCtArgList, keyArgs,
             hasCt, ctParamName, keyParams, cachedMethods);
     }
 
