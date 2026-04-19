@@ -36,7 +36,251 @@ public sealed class CacheGenerator : IIncrementalGenerator
         System.Threading.CancellationToken ct)
     {
         ct.ThrowIfCancellationRequested();
-        // Implement in Task 4
+
+        if (ctx.Node is not Microsoft.CodeAnalysis.CSharp.Syntax.InterfaceDeclarationSyntax)
+            return null;
+
+        if (ctx.SemanticModel.GetDeclaredSymbol(ctx.Node, ct) is not INamedTypeSymbol symbol)
+            return null;
+
+        var ifaceAttr = FindCacheAttr(symbol);
+        var ifaceConfig = ifaceAttr != null ? ReadConfig(ifaceAttr) : null;
+
+        var cachedMethods = new System.Collections.Generic.List<CachedMethodModel>();
+        var passthroughMethods = new System.Collections.Generic.List<PassthroughMethodModel>();
+        var diagnostics = new System.Collections.Generic.List<Microsoft.CodeAnalysis.Diagnostic>();
+
+        foreach (var member in symbol.GetMembers())
+        {
+            ct.ThrowIfCancellationRequested();
+            ParseMember(member, ifaceConfig, cachedMethods, passthroughMethods, diagnostics);
+        }
+
+        if (cachedMethods.Count == 0 && passthroughMethods.Count == 0 && ifaceConfig == null)
+            return null;
+
+        var ns = symbol.ContainingNamespace.IsGlobalNamespace
+            ? null
+            : symbol.ContainingNamespace.ToDisplayString();
+
+        return new CacheModel(
+            ns,
+            symbol.Name,
+            symbol.ToDisplayString(Microsoft.CodeAnalysis.SymbolDisplayFormat.FullyQualifiedFormat)
+                  .Replace("global::", ""),
+            cachedMethods.Exists(static m => m.EffectiveConfig.UseHybridCache),
+            cachedMethods.Exists(static m => m.EffectiveConfig.MaxEntries > 0),
+            System.Collections.Immutable.ImmutableArray.CreateRange(cachedMethods),
+            System.Collections.Immutable.ImmutableArray.CreateRange(passthroughMethods),
+            System.Collections.Immutable.ImmutableArray.CreateRange(diagnostics)
+        );
+    }
+
+    private static void ParseMember(
+        ISymbol member,
+        CacheConfig? ifaceConfig,
+        System.Collections.Generic.List<CachedMethodModel> cachedMethods,
+        System.Collections.Generic.List<PassthroughMethodModel> passthroughMethods,
+        System.Collections.Generic.List<Microsoft.CodeAnalysis.Diagnostic> diagnostics)
+    {
+        if (member is not IMethodSymbol method)
+            return;
+        if (method.MethodKind != MethodKind.Ordinary)
+            return;
+
+        var methodAttr = FindCacheAttr(method);
+        var methodConfig = methodAttr != null ? ReadConfig(methodAttr) : null;
+        var effectiveConfig = methodConfig ?? ifaceConfig;
+
+        BuildParamStrings(method, out var paramList, out var argList, out var nonCtArgList,
+            out var keyArgs, out var hasCt, out var ctParamName, out var keyParams);
+
+        if (effectiveConfig == null)
+        {
+            AddPassthrough(method, passthroughMethods, paramList, argList);
+            return;
+        }
+
+        EmitDiagnostics(method, effectiveConfig, keyParams, diagnostics);
+        AddCachedMethod(method, effectiveConfig, paramList, argList, nonCtArgList, keyArgs,
+            hasCt, ctParamName, keyParams, cachedMethods);
+    }
+
+    private static void BuildParamStrings(
+        IMethodSymbol method,
+        out string paramList,
+        out string argList,
+        out string nonCtArgList,
+        out string keyArgs,
+        out bool hasCt,
+        out string? ctParamName,
+        out System.Collections.Generic.List<KeyParam> keyParams)
+    {
+        var paramSb = new System.Text.StringBuilder();
+        var argSb = new System.Text.StringBuilder();
+        var nonCtArgSb = new System.Text.StringBuilder();
+        var keySb = new System.Text.StringBuilder();
+        hasCt = false;
+        ctParamName = null;
+        keyParams = new System.Collections.Generic.List<KeyParam>();
+        bool firstParam = true;
+        bool firstNonCtParam = true;
+
+        foreach (var param in method.Parameters)
+        {
+            if (!firstParam) { paramSb.Append(", "); argSb.Append(", "); }
+            firstParam = false;
+
+            var fqn = param.Type.ToDisplayString(Microsoft.CodeAnalysis.SymbolDisplayFormat.FullyQualifiedFormat);
+            paramSb.Append(fqn).Append(' ').Append(param.Name);
+            argSb.Append(param.Name);
+
+            bool isCt = string.Equals(param.Type.ToDisplayString(), "System.Threading.CancellationToken", System.StringComparison.Ordinal);
+            if (isCt)
+            {
+                hasCt = true;
+                ctParamName = param.Name;
+            }
+            else
+            {
+                if (!firstNonCtParam) nonCtArgSb.Append(", ");
+                firstNonCtParam = false;
+                nonCtArgSb.Append(param.Name);
+                keySb.Append(":{").Append(param.Name).Append('}');
+
+                bool isRef = param.Type.IsReferenceType
+                    && param.Type.SpecialType == Microsoft.CodeAnalysis.SpecialType.None;
+                keyParams.Add(new KeyParam(param.Name, isRef));
+            }
+        }
+
+        paramList = paramSb.ToString();
+        argList = argSb.ToString();
+        nonCtArgList = nonCtArgSb.ToString();
+        keyArgs = keySb.ToString();
+    }
+
+    private static void AddPassthrough(
+        IMethodSymbol method,
+        System.Collections.Generic.List<PassthroughMethodModel> passthroughMethods,
+        string paramList,
+        string argList)
+    {
+        var returnDisplay = method.ReturnType.ToDisplayString();
+        bool isAsync = returnDisplay.StartsWith("System.Threading.Tasks.ValueTask", System.StringComparison.Ordinal)
+                    || returnDisplay.StartsWith("System.Threading.Tasks.Task", System.StringComparison.Ordinal);
+        passthroughMethods.Add(new PassthroughMethodModel(
+            method.Name,
+            method.ReturnType.ToDisplayString(Microsoft.CodeAnalysis.SymbolDisplayFormat.FullyQualifiedFormat),
+            isAsync,
+            paramList,
+            argList
+        ));
+    }
+
+    private static void EmitDiagnostics(
+        IMethodSymbol method,
+        CacheConfig effectiveConfig,
+        System.Collections.Generic.List<KeyParam> keyParams,
+        System.Collections.Generic.List<Microsoft.CodeAnalysis.Diagnostic> diagnostics)
+    {
+        Location? firstLoc = null;
+        foreach (var loc in method.Locations)
+        {
+            firstLoc = loc;
+            break;
+        }
+
+        if (effectiveConfig.Sliding && effectiveConfig.UseHybridCache)
+        {
+            diagnostics.Add(Microsoft.CodeAnalysis.Diagnostic.Create(
+                CacheDiagnostics.SlidingNotSupportedOnHybridCache,
+                firstLoc,
+                method.Name));
+        }
+
+        foreach (var kp in keyParams)
+        {
+            if (kp.IsReferenceType)
+            {
+                diagnostics.Add(Microsoft.CodeAnalysis.Diagnostic.Create(
+                    CacheDiagnostics.ReferenceTypeKeyParameter,
+                    firstLoc,
+                    kp.Name,
+                    method.Name));
+            }
+        }
+    }
+
+    private static void AddCachedMethod(
+        IMethodSymbol method,
+        CacheConfig effectiveConfig,
+        string paramList,
+        string argList,
+        string nonCtArgList,
+        string keyArgs,
+        bool hasCt,
+        string? ctParamName,
+        System.Collections.Generic.List<KeyParam> keyParams,
+        System.Collections.Generic.List<CachedMethodModel> cachedMethods)
+    {
+        string innerReturnFqn;
+        if (method.ReturnType is INamedTypeSymbol namedReturn
+            && namedReturn.IsGenericType
+            && namedReturn.TypeArguments.Length == 1)
+        {
+            innerReturnFqn = namedReturn.TypeArguments[0]
+                .ToDisplayString(Microsoft.CodeAnalysis.SymbolDisplayFormat.FullyQualifiedFormat);
+        }
+        else
+        {
+            innerReturnFqn = method.ReturnType
+                .ToDisplayString(Microsoft.CodeAnalysis.SymbolDisplayFormat.FullyQualifiedFormat);
+        }
+
+        cachedMethods.Add(new CachedMethodModel(
+            method.Name,
+            method.ReturnType.ToDisplayString(Microsoft.CodeAnalysis.SymbolDisplayFormat.FullyQualifiedFormat),
+            innerReturnFqn,
+            paramList,
+            argList,
+            nonCtArgList,
+            keyArgs,
+            hasCt,
+            ctParamName,
+            System.Collections.Immutable.ImmutableArray.CreateRange(keyParams),
+            effectiveConfig
+        ));
+    }
+
+    private static AttributeData? FindCacheAttr(ISymbol symbol)
+    {
+        foreach (var attr in symbol.GetAttributes())
+        {
+            if (string.Equals(attr.AttributeClass?.ToDisplayString(), "ZeroAlloc.Cache.CacheAttribute", System.StringComparison.Ordinal))
+                return attr;
+        }
         return null;
+    }
+
+    private static CacheConfig? ReadConfig(AttributeData attr)
+    {
+        int ttlMs = 0;
+        bool sliding = false;
+        int maxEntries = 0;
+        bool useHybridCache = false;
+
+        foreach (var kv in attr.NamedArguments)
+        {
+            switch (kv.Key)
+            {
+                case "TtlMs":          ttlMs = (int)kv.Value.Value!;          break;
+                case "Sliding":        sliding = (bool)kv.Value.Value!;        break;
+                case "MaxEntries":     maxEntries = (int)kv.Value.Value!;      break;
+                case "UseHybridCache": useHybridCache = (bool)kv.Value.Value!; break;
+            }
+        }
+
+        return ttlMs > 0 ? new CacheConfig(ttlMs, sliding, maxEntries, useHybridCache) : null;
     }
 }
