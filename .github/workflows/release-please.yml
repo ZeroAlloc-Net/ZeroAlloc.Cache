@@ -1,0 +1,70 @@
+name: Release Please
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  release-please:
+    runs-on: ubuntu-latest
+    outputs:
+      release_created: ${{ steps.release.outputs.release_created }}
+      tag_name: ${{ steps.release.outputs.tag_name }}
+      version: ${{ steps.release.outputs.version }}
+    steps:
+      - uses: googleapis/release-please-action@v4
+        id: release
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+  publish:
+    needs: release-please
+    if: ${{ needs.release-please.outputs.release_created }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v5
+        with:
+          dotnet-version: '10.0.x'
+
+      - name: Restore tools
+        run: dotnet tool restore
+
+      - name: Restore
+        run: dotnet restore
+
+      - name: Build
+        run: dotnet build -c Release -p:Version=${{ needs.release-please.outputs.version }} --no-restore
+
+      - name: Test
+        run: dotnet test -c Release --no-build
+
+      - name: Pack ZeroAlloc.Cache
+        run: >
+          dotnet pack src/ZeroAlloc.Cache/ZeroAlloc.Cache.csproj
+          -c Release -p:Version=${{ needs.release-please.outputs.version }}
+          --no-build -o ./artifacts
+
+      - name: Pack ZeroAlloc.Cache.Generator
+        run: >
+          dotnet pack src/ZeroAlloc.Cache.Generator/ZeroAlloc.Cache.Generator.csproj
+          -c Release -p:Version=${{ needs.release-please.outputs.version }}
+          --no-build -o ./artifacts
+
+      - name: Push to NuGet
+        run: |
+          dotnet nuget push ./artifacts/*.nupkg \
+            --source https://api.nuget.org/v3/index.json \
+            --api-key ${{ secrets.NUGET_API_KEY }} \
+            --skip-duplicate
+
+      - name: Upload to GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ needs.release-please.outputs.tag_name }}
+          files: ./artifacts/*.nupkg
