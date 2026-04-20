@@ -272,7 +272,8 @@ internal static class CacheWriter
         bool anyHybridCache,
         bool anyIsolated)
     {
-        if (anyIsolated && !anyHybridCache)
+        // Pure passthrough (no cached methods) or isolated-only: constructor takes only inner
+        if (!anyIMemoryCache && !anyHybridCache)
         {
             sb.AppendLine($"            new {proxyName}(sp.GetRequiredService<TImpl>()));");
             return;

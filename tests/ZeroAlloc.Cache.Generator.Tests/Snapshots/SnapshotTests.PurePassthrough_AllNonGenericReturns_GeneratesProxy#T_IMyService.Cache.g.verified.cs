@@ -30,9 +30,7 @@ public static partial class CacheServiceCollectionExtensions
     {
         services.AddTransient<TImpl>();
         services.AddTransient<global::T.IMyService>(sp =>
-            new IMyServiceCacheProxy(
-                sp.GetRequiredService<TImpl>(),
-                sp.GetRequiredService<global::Microsoft.Extensions.Caching.Hybrid.HybridCache>()));
+            new IMyServiceCacheProxy(sp.GetRequiredService<TImpl>()));
         return services;
     }
 }
