@@ -47,6 +47,13 @@ internal static class CacheWriter
     private static string OptionsFieldName(string methodName) =>
         $"_{char.ToLowerInvariant(methodName[0])}{methodName.Substring(1)}Options";
 
+    private static string StripInterfacePrefix(string name)
+    {
+        if (name.Length > 1 && name[0] == 'I' && char.IsUpper(name[1]))
+            return name.Substring(1);
+        return name;
+    }
+
     private static void WriteProxyFields(StringBuilder sb, string ifaceFqn, CacheModel model)
     {
         sb.AppendLine($"    private readonly {ifaceFqn} _inner;");
@@ -234,7 +241,7 @@ internal static class CacheWriter
     {
         var ifaceFqn = $"global::{model.InterfaceFqn}";
         var proxyName = $"{model.InterfaceName}CacheProxy";
-        var methodName = $"Add{model.InterfaceName.TrimStart('I')}Cache";
+        var methodName = $"Add{StripInterfacePrefix(model.InterfaceName)}Cache";
 
         bool anyIMemoryCache = model.AnyMethodUsesIMemoryCache;
         bool anyHybridCache = model.AnyMethodUsesHybridCache;

@@ -159,4 +159,38 @@ public sealed class SnapshotTests
             """;
         return TestHelper.Verify(source);
     }
+
+    [Fact]
+    public Task GlobalNamespace_GeneratesProxy()
+    {
+        const string source = """
+            using ZeroAlloc.Cache;
+            using System.Threading;
+            using System.Threading.Tasks;
+            [Cache(TtlMs = 5_000)]
+            public interface IGlobalService
+            {
+                ValueTask<string> GetAsync(int id, CancellationToken ct);
+            }
+            """;
+        return TestHelper.Verify(source);
+    }
+
+    [Fact]
+    public Task PurePassthrough_AllNonGenericReturns_GeneratesProxy()
+    {
+        const string source = """
+            using ZeroAlloc.Cache;
+            using System.Threading;
+            using System.Threading.Tasks;
+            namespace T;
+            [Cache(TtlMs = 5_000)]
+            public interface IMyService
+            {
+                ValueTask SaveAsync(string data, CancellationToken ct);
+                ValueTask DeleteAsync(int id, CancellationToken ct);
+            }
+            """;
+        return TestHelper.Verify(source);
+    }
 }

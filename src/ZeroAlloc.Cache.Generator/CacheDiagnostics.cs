@@ -32,4 +32,12 @@ internal static class CacheDiagnostics
         defaultSeverity: DiagnosticSeverity.Error,
         isEnabledByDefault: true
     );
+
+    public static readonly DiagnosticDescriptor MixedMaxEntriesValues = new(
+        id: "ZC0004",
+        title: "Mixed MaxEntries values",
+        messageFormat: "Interface '{0}': multiple methods specify different MaxEntries values. All methods share a single isolated MemoryCache; the first MaxEntries value ({1}) is used as SizeLimit.",
+        category: Category,
+        defaultSeverity: DiagnosticSeverity.Warning,
+        isEnabledByDefault: true);
 }

@@ -68,13 +68,13 @@ public sealed class CacheGenerator : IIncrementalGenerator
             : symbol.ContainingNamespace.ToDisplayString() + "." + symbol.Name;
 
         // v1: all isolated methods share a single MemoryCache with SizeLimit = first MaxEntries > 0 value.
-        // Mixed MaxEntries values on the same interface are silently normalized to the first.
         int isolatedCacheMaxEntries = 0;
         for (int i = 0; i < cachedMethods.Count; i++)
         {
             if (cachedMethods[i].EffectiveConfig.MaxEntries > 0) { isolatedCacheMaxEntries = cachedMethods[i].EffectiveConfig.MaxEntries; break; }
         }
 
+        CheckMixedMaxEntries(symbol, cachedMethods, isolatedCacheMaxEntries, diagnostics);
         CheckHybridCacheAvailability(ctx, symbol, cachedMethods, diagnostics);
 
         return new CacheModel(
@@ -107,7 +107,7 @@ public sealed class CacheGenerator : IIncrementalGenerator
         var methodConfig = methodAttr != null ? ReadConfig(methodAttr) : null;
         var effectiveConfig = methodConfig ?? ifaceConfig;
 
-        BuildParamStrings(method, out var paramList, out var argList, out var nonCtArgList,
+        BuildParamStrings(method, out var paramList, out var argList,
             out var keyArgs, out var hasCt, out var ctParamName, out var keyParams);
 
         // A method is passthrough if there is no effective config, OR if the return type
@@ -124,7 +124,7 @@ public sealed class CacheGenerator : IIncrementalGenerator
         }
 
         EmitDiagnostics(method, effectiveConfig!, keyParams, diagnostics);
-        AddCachedMethod(method, effectiveConfig!, paramList, argList, nonCtArgList, keyArgs,
+        AddCachedMethod(method, effectiveConfig!, paramList, argList, keyArgs,
             hasCt, ctParamName, keyParams, cachedMethods);
     }
 
@@ -132,7 +132,6 @@ public sealed class CacheGenerator : IIncrementalGenerator
         IMethodSymbol method,
         out string paramList,
         out string argList,
-        out string nonCtArgList,
         out string keyArgs,
         out bool hasCt,
         out string? ctParamName,
@@ -140,13 +139,11 @@ public sealed class CacheGenerator : IIncrementalGenerator
     {
         var paramSb = new System.Text.StringBuilder();
         var argSb = new System.Text.StringBuilder();
-        var nonCtArgSb = new System.Text.StringBuilder();
         var keySb = new System.Text.StringBuilder();
         hasCt = false;
         ctParamName = null;
         keyParams = new System.Collections.Generic.List<KeyParam>();
         bool firstParam = true;
-        bool firstNonCtParam = true;
 
         foreach (var param in method.Parameters)
         {
@@ -165,9 +162,6 @@ public sealed class CacheGenerator : IIncrementalGenerator
             }
             else
             {
-                if (!firstNonCtParam) nonCtArgSb.Append(", ");
-                firstNonCtParam = false;
-                nonCtArgSb.Append(param.Name);
                 keySb.Append(":{").Append(param.Name).Append('}');
 
                 bool isRef = param.Type.IsReferenceType
@@ -178,7 +172,6 @@ public sealed class CacheGenerator : IIncrementalGenerator
 
         paramList = paramSb.ToString();
         argList = argSb.ToString();
-        nonCtArgList = nonCtArgSb.ToString();
         keyArgs = keySb.ToString();
     }
 
@@ -237,7 +230,6 @@ public sealed class CacheGenerator : IIncrementalGenerator
         CacheConfig effectiveConfig,
         string paramList,
         string argList,
-        string nonCtArgList,
         string keyArgs,
         bool hasCt,
         string? ctParamName,
@@ -264,13 +256,38 @@ public sealed class CacheGenerator : IIncrementalGenerator
             innerReturnFqn,
             paramList,
             argList,
-            nonCtArgList,
             keyArgs,
             hasCt,
             ctParamName,
             System.Collections.Immutable.ImmutableArray.CreateRange(keyParams),
             effectiveConfig
         ));
+    }
+
+    private static void CheckMixedMaxEntries(
+        INamedTypeSymbol symbol,
+        System.Collections.Generic.List<CachedMethodModel> cachedMethods,
+        int firstMaxEntries,
+        System.Collections.Generic.List<Microsoft.CodeAnalysis.Diagnostic> diagnostics)
+    {
+        if (firstMaxEntries <= 0) return;
+
+        bool hasDifferent = false;
+        for (int i = 0; i < cachedMethods.Count; i++)
+        {
+            int me = cachedMethods[i].EffectiveConfig.MaxEntries;
+            if (me > 0 && me != firstMaxEntries) { hasDifferent = true; break; }
+        }
+
+        if (!hasDifferent) return;
+
+        Location? firstLoc = null;
+        foreach (var loc in symbol.Locations) { firstLoc = loc; break; }
+        diagnostics.Add(Microsoft.CodeAnalysis.Diagnostic.Create(
+            CacheDiagnostics.MixedMaxEntriesValues,
+            firstLoc,
+            symbol.Name,
+            firstMaxEntries));
     }
 
     private static void CheckHybridCacheAvailability(

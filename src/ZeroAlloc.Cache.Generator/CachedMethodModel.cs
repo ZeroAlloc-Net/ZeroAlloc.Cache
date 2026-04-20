@@ -8,7 +8,6 @@ internal sealed record CachedMethodModel(
     string InnerReturnTypeFqn,  // e.g., "string" — the T in ValueTask<T>
     string ParameterList,       // e.g., "global::System.String id, global::System.Threading.CancellationToken ct"
     string ArgumentList,        // e.g., "id, ct" — all args
-    string NonCtArgumentList,   // e.g., "id" — non-CancellationToken args only
     string KeyArguments,        // e.g., ":{id}" or ":{id}:{page}" — appended in key interpolation
     bool HasCancellationToken,
     string? CancellationTokenParamName,
@@ -26,7 +25,6 @@ internal sealed record CachedMethodModel(
             && string.Equals(InnerReturnTypeFqn, other.InnerReturnTypeFqn, System.StringComparison.Ordinal)
             && string.Equals(ParameterList, other.ParameterList, System.StringComparison.Ordinal)
             && string.Equals(ArgumentList, other.ArgumentList, System.StringComparison.Ordinal)
-            && string.Equals(NonCtArgumentList, other.NonCtArgumentList, System.StringComparison.Ordinal)
             && string.Equals(KeyArguments, other.KeyArguments, System.StringComparison.Ordinal)
             && HasCancellationToken == other.HasCancellationToken
             && string.Equals(CancellationTokenParamName, other.CancellationTokenParamName, System.StringComparison.Ordinal)
