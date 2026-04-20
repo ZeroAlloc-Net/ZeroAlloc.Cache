@@ -75,6 +75,8 @@ public sealed class CacheGenerator : IIncrementalGenerator
             if (cachedMethods[i].EffectiveConfig.MaxEntries > 0) { isolatedCacheMaxEntries = cachedMethods[i].EffectiveConfig.MaxEntries; break; }
         }
 
+        CheckHybridCacheAvailability(ctx, symbol, cachedMethods, diagnostics);
+
         return new CacheModel(
             ns,
             symbol.Name,
@@ -269,6 +271,28 @@ public sealed class CacheGenerator : IIncrementalGenerator
             System.Collections.Immutable.ImmutableArray.CreateRange(keyParams),
             effectiveConfig
         ));
+    }
+
+    private static void CheckHybridCacheAvailability(
+        GeneratorSyntaxContext ctx,
+        INamedTypeSymbol symbol,
+        System.Collections.Generic.List<CachedMethodModel> cachedMethods,
+        System.Collections.Generic.List<Microsoft.CodeAnalysis.Diagnostic> diagnostics)
+    {
+        if (!cachedMethods.Exists(static m => m.EffectiveConfig.UseHybridCache))
+            return;
+
+        var hybridCacheType = ctx.SemanticModel.Compilation
+            .GetTypeByMetadataName("Microsoft.Extensions.Caching.Hybrid.HybridCache");
+        if (hybridCacheType is not null)
+            return;
+
+        // HybridCache assembly not referenced — emit an error
+        Location? firstLoc = null;
+        foreach (var loc in symbol.Locations) { firstLoc = loc; break; }
+        diagnostics.Add(Microsoft.CodeAnalysis.Diagnostic.Create(
+            CacheDiagnostics.HybridCacheNotAvailable,
+            firstLoc));
     }
 
     private static AttributeData? FindCacheAttr(ISymbol symbol)

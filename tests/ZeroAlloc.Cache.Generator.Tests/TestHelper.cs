@@ -20,6 +20,7 @@ internal static class TestHelper
             .Select(a => MetadataReference.CreateFromFile(a.Location))
             .Cast<MetadataReference>()
             .Append(MetadataReference.CreateFromFile(typeof(ZeroAlloc.Cache.CacheAttribute).Assembly.Location))
+            .Append(MetadataReference.CreateFromFile(typeof(Microsoft.Extensions.Caching.Hybrid.HybridCache).Assembly.Location))
             .ToList();
 
         var compilation = CSharpCompilation.Create(
@@ -45,6 +46,7 @@ internal static class TestHelper
             .Select(a => MetadataReference.CreateFromFile(a.Location))
             .Cast<MetadataReference>()
             .Append(MetadataReference.CreateFromFile(typeof(ZeroAlloc.Cache.CacheAttribute).Assembly.Location))
+            .Append(MetadataReference.CreateFromFile(typeof(Microsoft.Extensions.Caching.Hybrid.HybridCache).Assembly.Location))
             .ToList();
 
         var compilation = CSharpCompilation.Create(
