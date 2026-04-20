@@ -40,7 +40,7 @@ builder.Services.AddIProductRepositoryCache<ProductRepositoryImpl>();
 
 This registers:
 - `ProductRepositoryImpl` as a transient inner implementation
-- The generated `IProductRepositoryCacheProxy` as the `IProductRepository` singleton
+- The generated `IProductRepositoryCacheProxy` as the `IProductRepository` transient
 
 No manual factory wiring is required.
 
