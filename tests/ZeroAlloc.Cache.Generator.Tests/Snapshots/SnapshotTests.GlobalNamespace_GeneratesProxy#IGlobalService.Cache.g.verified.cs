@@ -32,7 +32,10 @@ internal sealed class IGlobalServiceCacheProxy : global::IGlobalService
 
 public static partial class CacheServiceCollectionExtensions
 {
-    public static global::Microsoft.Extensions.DependencyInjection.IServiceCollection AddGlobalServiceCache<TImpl>(
+    public static global::Microsoft.Extensions.DependencyInjection.IServiceCollection AddGlobalServiceCache<
+        [global::System.Diagnostics.CodeAnalysis.DynamicallyAccessedMembers(
+            global::System.Diagnostics.CodeAnalysis.DynamicallyAccessedMemberTypes.PublicConstructors)]
+        TImpl>(
         this global::Microsoft.Extensions.DependencyInjection.IServiceCollection services)
         where TImpl : class, global::IGlobalService
     {

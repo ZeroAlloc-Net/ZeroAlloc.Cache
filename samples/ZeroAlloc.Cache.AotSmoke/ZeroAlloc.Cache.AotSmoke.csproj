@@ -7,14 +7,7 @@
     <InvariantGlobalization>true</InvariantGlobalization>
     <OptimizationPreference>Size</OptimizationPreference>
 
-    <!--
-      IL2091 is temporarily suppressed: the generator emits Add{Service}Cache<TImpl>
-      without [DynamicallyAccessedMembers(PublicConstructors)] on TImpl, which
-      propagates an AOT warning from AddTransient<T>. Tracked as #7 — remove
-      this suppression once the generator emits the annotation.
-    -->
-    <WarningsAsErrors>$(WarningsAsErrors);IL2026;IL2067;IL2075;IL3050;IL3051</WarningsAsErrors>
-    <NoWarn>$(NoWarn);IL2091</NoWarn>
+    <WarningsAsErrors>$(WarningsAsErrors);IL2026;IL2067;IL2075;IL2091;IL3050;IL3051</WarningsAsErrors>
   </PropertyGroup>
 
   <ItemGroup>
