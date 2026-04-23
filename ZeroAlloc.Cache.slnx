@@ -3,6 +3,9 @@
     <Project Path="src/ZeroAlloc.Cache/ZeroAlloc.Cache.csproj" />
     <Project Path="src/ZeroAlloc.Cache.Generator/ZeroAlloc.Cache.Generator.csproj" />
   </Folder>
+  <Folder Name="/benchmarks/">
+    <Project Path="benchmarks/ZeroAlloc.Cache.Benchmarks/ZeroAlloc.Cache.Benchmarks.csproj" />
+  </Folder>
   <Folder Name="/samples/">
     <Project Path="samples/ZeroAlloc.Cache.AotSmoke/ZeroAlloc.Cache.AotSmoke.csproj" />
   </Folder>
