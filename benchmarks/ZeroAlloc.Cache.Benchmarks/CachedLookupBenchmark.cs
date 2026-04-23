@@ -35,22 +35,22 @@ public class CachedLookupBenchmark
     public void Cleanup() => _cache.Dispose();
 
     [Benchmark(Baseline = true, Description = "direct (no cache)")]
-    public async Task<string?> Direct()
+    public async Task<string> Direct()
         => await _direct.GetNameAsync(42, CancellationToken.None).ConfigureAwait(false);
 
     [Benchmark(Description = "proxied (cache hit)")]
-    public async Task<string?> Proxied()
+    public async Task<string> Proxied()
         => await _proxied.GetNameAsync(42, CancellationToken.None).ConfigureAwait(false);
 }
 
 [Cache(TtlMs = 60_000)]
 public interface ICustomerService
 {
-    ValueTask<string?> GetNameAsync(int customerId, CancellationToken ct);
+    ValueTask<string> GetNameAsync(int customerId, CancellationToken ct);
 }
 
 public sealed class CustomerService : ICustomerService
 {
-    public ValueTask<string?> GetNameAsync(int customerId, CancellationToken ct)
-        => ValueTask.FromResult<string?>($"customer-{customerId}");
+    public ValueTask<string> GetNameAsync(int customerId, CancellationToken ct)
+        => ValueTask.FromResult($"customer-{customerId}");
 }
