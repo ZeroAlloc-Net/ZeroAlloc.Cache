@@ -249,7 +249,12 @@ internal static class CacheWriter
 
         sb.AppendLine("public static partial class CacheServiceCollectionExtensions");
         sb.AppendLine("{");
-        sb.AppendLine($"    public static global::Microsoft.Extensions.DependencyInjection.IServiceCollection {methodName}<TImpl>(");
+        sb.AppendLine($"    public static global::Microsoft.Extensions.DependencyInjection.IServiceCollection {methodName}<");
+        // IL2091: TImpl flows into AddTransient<T> which requires PublicConstructors.
+        // Without this annotation consumers' publish fails when they promote IL2091 to error.
+        sb.AppendLine("        [global::System.Diagnostics.CodeAnalysis.DynamicallyAccessedMembers(");
+        sb.AppendLine("            global::System.Diagnostics.CodeAnalysis.DynamicallyAccessedMemberTypes.PublicConstructors)]");
+        sb.AppendLine("        TImpl>(");
         sb.AppendLine("        this global::Microsoft.Extensions.DependencyInjection.IServiceCollection services)");
         sb.AppendLine($"        where TImpl : class, {ifaceFqn}");
         sb.AppendLine("    {");
