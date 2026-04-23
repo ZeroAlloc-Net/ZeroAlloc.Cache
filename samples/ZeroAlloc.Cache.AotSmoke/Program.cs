@@ -14,22 +14,19 @@ using var cache = new MemoryCache(new MemoryCacheOptions());
 var impl = new CustomerService();
 var proxy = new ICustomerServiceCacheProxy(impl, cache);
 
-// Cache miss — inner called
-var first = await proxy.GetNameAsync(42, CancellationToken.None);
+var first = await proxy.GetNameAsync(42, CancellationToken.None).ConfigureAwait(false);
 if (!string.Equals(first, "customer-42", StringComparison.Ordinal))
     return Fail($"First call expected 'customer-42', got '{first}'");
 if (impl.CallCount != 1)
     return Fail($"After first call, CallCount expected 1, got {impl.CallCount}");
 
-// Cache hit — inner NOT called
-var second = await proxy.GetNameAsync(42, CancellationToken.None);
+var second = await proxy.GetNameAsync(42, CancellationToken.None).ConfigureAwait(false);
 if (!string.Equals(second, "customer-42", StringComparison.Ordinal))
     return Fail($"Second call expected 'customer-42', got '{second}'");
 if (impl.CallCount != 1)
     return Fail($"After cache hit, CallCount expected still 1, got {impl.CallCount}");
 
-// Different key → cache miss
-var other = await proxy.GetNameAsync(99, CancellationToken.None);
+var other = await proxy.GetNameAsync(99, CancellationToken.None).ConfigureAwait(false);
 if (!string.Equals(other, "customer-99", StringComparison.Ordinal))
     return Fail($"Different-key call expected 'customer-99', got '{other}'");
 if (impl.CallCount != 2)
