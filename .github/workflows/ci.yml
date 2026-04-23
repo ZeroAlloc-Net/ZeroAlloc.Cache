@@ -58,3 +58,31 @@ jobs:
             --source https://api.nuget.org/v3/index.json \
             --api-key ${{ secrets.NUGET_API_KEY }} \
             --skip-duplicate
+
+  aot-smoke:
+    runs-on: ubuntu-latest
+    # Publishes samples/ZeroAlloc.Cache.AotSmoke with PublishAot=true. The
+    # generator emits an interface proxy — classic territory for reflection
+    # hazards — so this job catches any IL2026/IL3050 regression in the
+    # proxy emission before it ships.
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v5
+        with:
+          dotnet-version: '10.0.x'
+
+      - name: Install AOT native toolchain
+        run: sudo apt-get update && sudo apt-get install -y clang zlib1g-dev
+
+      - name: Restore
+        run: dotnet restore samples/ZeroAlloc.Cache.AotSmoke/ZeroAlloc.Cache.AotSmoke.csproj
+
+      - name: Publish AOT
+        run: dotnet publish samples/ZeroAlloc.Cache.AotSmoke/ZeroAlloc.Cache.AotSmoke.csproj -r linux-x64 -c Release -o ./aot-out
+
+      - name: Run AOT binary
+        run: ./aot-out/ZeroAlloc.Cache.AotSmoke
