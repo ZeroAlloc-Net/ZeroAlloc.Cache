@@ -5,8 +5,24 @@
 using Microsoft.Extensions.Caching.Memory;
 using Microsoft.Extensions.DependencyInjection;
 
+using System.Diagnostics;
+using System.Diagnostics.Metrics;
+
 internal sealed class IGlobalServiceCacheProxy : global::IGlobalService
 {
+    private static readonly global::System.Diagnostics.Metrics.Meter _meter =
+        new("ZeroAlloc.Cache");
+    private static readonly global::System.Diagnostics.ActivitySource _activitySource =
+        new("ZeroAlloc.Cache");
+    private static readonly global::System.Diagnostics.Metrics.Histogram<double> _lookupDurationMs =
+        _meter.CreateHistogram<double>("cache.lookup_duration_ms");
+    private static readonly global::System.Diagnostics.Metrics.Counter<long> _hits =
+        _meter.CreateCounter<long>("cache.hits");
+    private static readonly global::System.Diagnostics.Metrics.Counter<long> _misses =
+        _meter.CreateCounter<long>("cache.misses");
+    private static readonly global::System.Diagnostics.Metrics.Counter<long> _evictions =
+        _meter.CreateCounter<long>("cache.evictions");
+
     private readonly global::IGlobalService _inner;
     private readonly global::Microsoft.Extensions.Caching.Memory.IMemoryCache _cache;
 
@@ -20,11 +36,29 @@ internal sealed class IGlobalServiceCacheProxy : global::IGlobalService
 
     public async global::System.Threading.Tasks.ValueTask<string> GetAsync(int id, global::System.Threading.CancellationToken ct)
     {
+        using var __activity = _activitySource.StartActivity("cache.lookup");
+        __activity?.SetTag("cache.method", "IGlobalService.GetAsync");
+        var __sw = global::System.Diagnostics.Stopwatch.GetTimestamp();
         var __key = $"IGlobalService.GetAsync:{id}";
         if (_cache.TryGetValue(__key, out string? __cached))
+        {
+            _hits.Add(1, new global::System.Collections.Generic.KeyValuePair<string, object?>("method", "GetAsync"));
+            __activity?.SetTag("cache.tier", "L1");
+            __activity?.SetTag("cache.hit", true);
+            _lookupDurationMs.Record(global::System.Diagnostics.Stopwatch.GetElapsedTime(__sw).TotalMilliseconds,
+                new global::System.Collections.Generic.KeyValuePair<string, object?>("cache.method", "IGlobalService.GetAsync"));
             return __cached!;
+        }
+        _misses.Add(1, new global::System.Collections.Generic.KeyValuePair<string, object?>("method", "GetAsync"));
         var __result = await _inner.GetAsync(id, ct).ConfigureAwait(false);
-        _cache.Set(__key, __result, global::System.TimeSpan.FromMilliseconds(5000));
+        _cache.Set(__key, __result, new global::Microsoft.Extensions.Caching.Memory.MemoryCacheEntryOptions
+            { AbsoluteExpirationRelativeToNow = global::System.TimeSpan.FromMilliseconds(5000) }
+            .RegisterPostEvictionCallback(static (_, _, _, _) =>
+                _evictions.Add(1, new global::System.Collections.Generic.KeyValuePair<string, object?>("method", "GetAsync"))));
+        __activity?.SetTag("cache.tier", "L1");
+        __activity?.SetTag("cache.hit", false);
+        _lookupDurationMs.Record(global::System.Diagnostics.Stopwatch.GetElapsedTime(__sw).TotalMilliseconds,
+            new global::System.Collections.Generic.KeyValuePair<string, object?>("cache.method", "IGlobalService.GetAsync"));
         return __result;
     }
 

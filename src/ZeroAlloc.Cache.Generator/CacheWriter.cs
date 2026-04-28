@@ -15,11 +15,36 @@ internal static class CacheWriter
         sb.AppendLine("#nullable enable");
         sb.AppendLine();
 
-        // Usings required by extension methods used in the proxy body
+        // Extension-method usings: global:: qualifies type names but NOT extension methods.
+        bool emitDiUsing = model.AnyMethodUsesIMemoryCache || model.AnyMethodUsesIsolatedCache || model.AnyMethodUsesHybridCache;
         if (model.AnyMethodUsesIMemoryCache || model.AnyMethodUsesIsolatedCache)
         {
             sb.AppendLine("using Microsoft.Extensions.Caching.Memory;");
+        }
+        if (model.AnyMethodUsesHybridCache)
+        {
+            // AddHybridCache() is an extension on IServiceCollection in Microsoft.Extensions.Caching.Hybrid.
+            sb.AppendLine("using Microsoft.Extensions.Caching.Hybrid;");
+        }
+        if (emitDiUsing)
+        {
+            // AddTransient/AddMemoryCache extension methods.
             sb.AppendLine("using Microsoft.Extensions.DependencyInjection;");
+            sb.AppendLine();
+        }
+
+        bool anyNonHybridCached = false;
+        bool anyHybridCachedMethod = false;
+        foreach (var m in model.CachedMethods)
+        {
+            if (!m.EffectiveConfig.UseHybridCache) anyNonHybridCached = true;
+            else anyHybridCachedMethod = true;
+        }
+
+        if (anyNonHybridCached || anyHybridCachedMethod)
+        {
+            sb.AppendLine("using System.Diagnostics;");
+            sb.AppendLine("using System.Diagnostics.Metrics;");
             sb.AppendLine();
         }
 
@@ -56,6 +81,16 @@ internal static class CacheWriter
 
     private static void WriteProxyFields(StringBuilder sb, string ifaceFqn, CacheModel model)
     {
+        bool anyNonHybridCached = false;
+        bool anyHybridCachedMethod = false;
+        foreach (var m in model.CachedMethods)
+        {
+            if (!m.EffectiveConfig.UseHybridCache) anyNonHybridCached = true;
+            else anyHybridCachedMethod = true;
+        }
+
+        WriteTelemetryFields(sb, anyNonHybridCached, anyHybridCachedMethod);
+
         sb.AppendLine($"    private readonly {ifaceFqn} _inner;");
 
         if (model.AnyMethodUsesIsolatedCache)
@@ -77,6 +112,41 @@ internal static class CacheWriter
             var fieldName = OptionsFieldName(m.Name);
             sb.AppendLine($"    private static readonly global::Microsoft.Extensions.Caching.Hybrid.HybridCacheEntryOptions {fieldName} =");
             sb.AppendLine($"        new() {{ Expiration = global::System.TimeSpan.FromMilliseconds({m.EffectiveConfig.TtlMs}) }};");
+            sb.AppendLine();
+        }
+    }
+
+    private static void WriteTelemetryFields(StringBuilder sb, bool anyNonHybridCached, bool anyHybridCachedMethod)
+    {
+        if (anyNonHybridCached || anyHybridCachedMethod)
+        {
+            sb.AppendLine($"    private static readonly global::System.Diagnostics.Metrics.Meter _meter =");
+            sb.AppendLine($"        new(\"ZeroAlloc.Cache\");");
+            sb.AppendLine($"    private static readonly global::System.Diagnostics.ActivitySource _activitySource =");
+            sb.AppendLine($"        new(\"ZeroAlloc.Cache\");");
+            sb.AppendLine($"    private static readonly global::System.Diagnostics.Metrics.Histogram<double> _lookupDurationMs =");
+            sb.AppendLine($"        _meter.CreateHistogram<double>(\"cache.lookup_duration_ms\");");
+        }
+
+        if (anyNonHybridCached)
+        {
+            sb.AppendLine($"    private static readonly global::System.Diagnostics.Metrics.Counter<long> _hits =");
+            sb.AppendLine($"        _meter.CreateCounter<long>(\"cache.hits\");");
+            sb.AppendLine($"    private static readonly global::System.Diagnostics.Metrics.Counter<long> _misses =");
+            sb.AppendLine($"        _meter.CreateCounter<long>(\"cache.misses\");");
+            sb.AppendLine($"    private static readonly global::System.Diagnostics.Metrics.Counter<long> _evictions =");
+            sb.AppendLine($"        _meter.CreateCounter<long>(\"cache.evictions\");");
+        }
+
+        if (anyHybridCachedMethod)
+        {
+            // HybridCache does not expose per-entry hit/miss; we count total factory invocations instead.
+            sb.AppendLine($"    private static readonly global::System.Diagnostics.Metrics.Counter<long> _hybridCalls =");
+            sb.AppendLine($"        _meter.CreateCounter<long>(\"cache.hybrid_calls\");");
+        }
+
+        if (anyNonHybridCached || anyHybridCachedMethod)
+        {
             sb.AppendLine();
         }
     }
@@ -148,13 +218,29 @@ internal static class CacheWriter
 
     private static void WriteCachedMethod(StringBuilder sb, string interfaceName, CachedMethodModel m)
     {
+        var cacheMethodTag = $"{interfaceName}.{m.Name}";
         sb.AppendLine($"    public async {m.ReturnTypeFqn} {m.Name}({m.ParameterList})");
         sb.AppendLine("    {");
+        sb.AppendLine($"        using var __activity = _activitySource.StartActivity(\"cache.lookup\");");
+        sb.AppendLine($"        __activity?.SetTag(\"cache.method\", \"{cacheMethodTag}\");");
+        sb.AppendLine($"        var __sw = global::System.Diagnostics.Stopwatch.GetTimestamp();");
         sb.AppendLine($"        var __key = $\"{interfaceName}.{m.Name}{m.KeyArguments}\";");
         sb.AppendLine($"        if (_cache.TryGetValue(__key, out {m.InnerReturnTypeFqn}? __cached))");
+        sb.AppendLine("        {");
+        sb.AppendLine($"            _hits.Add(1, new global::System.Collections.Generic.KeyValuePair<string, object?>(\"method\", \"{m.Name}\"));");
+        sb.AppendLine($"            __activity?.SetTag(\"cache.tier\", \"L1\");");
+        sb.AppendLine($"            __activity?.SetTag(\"cache.hit\", true);");
+        sb.AppendLine($"            _lookupDurationMs.Record(global::System.Diagnostics.Stopwatch.GetElapsedTime(__sw).TotalMilliseconds,");
+        sb.AppendLine($"                new global::System.Collections.Generic.KeyValuePair<string, object?>(\"cache.method\", \"{cacheMethodTag}\"));");
         sb.AppendLine("            return __cached!;");
+        sb.AppendLine("        }");
+        sb.AppendLine($"        _misses.Add(1, new global::System.Collections.Generic.KeyValuePair<string, object?>(\"method\", \"{m.Name}\"));");
         sb.AppendLine($"        var __result = await _inner.{m.Name}({m.ArgumentList}).ConfigureAwait(false);");
         WriteCacheSetCall(sb, m);
+        sb.AppendLine($"        __activity?.SetTag(\"cache.tier\", \"L1\");");
+        sb.AppendLine($"        __activity?.SetTag(\"cache.hit\", false);");
+        sb.AppendLine($"        _lookupDurationMs.Record(global::System.Diagnostics.Stopwatch.GetElapsedTime(__sw).TotalMilliseconds,");
+        sb.AppendLine($"            new global::System.Collections.Generic.KeyValuePair<string, object?>(\"cache.method\", \"{cacheMethodTag}\"));");
         sb.AppendLine("        return __result;");
         sb.AppendLine("    }");
         sb.AppendLine();
@@ -163,71 +249,91 @@ internal static class CacheWriter
     private static void WriteCacheSetCall(StringBuilder sb, CachedMethodModel m)
     {
         bool isolated = m.EffectiveConfig.MaxEntries > 0;
-        if (isolated || m.EffectiveConfig.Sliding)
-        {
-            sb.AppendLine($"        _cache.Set(__key, __result, new global::Microsoft.Extensions.Caching.Memory.MemoryCacheEntryOptions");
-            if (m.EffectiveConfig.Sliding)
-                sb.Append($"            {{ SlidingExpiration = global::System.TimeSpan.FromMilliseconds({m.EffectiveConfig.TtlMs})");
-            else
-                sb.Append($"            {{ AbsoluteExpirationRelativeToNow = global::System.TimeSpan.FromMilliseconds({m.EffectiveConfig.TtlMs})");
-            if (isolated)
-                sb.AppendLine(", Size = 1 });");
-            else
-                sb.AppendLine(" });");
-        }
+        // Always use MemoryCacheEntryOptions so we can attach the eviction callback.
+        sb.AppendLine($"        _cache.Set(__key, __result, new global::Microsoft.Extensions.Caching.Memory.MemoryCacheEntryOptions");
+
+        if (m.EffectiveConfig.Sliding)
+            sb.Append($"            {{ SlidingExpiration = global::System.TimeSpan.FromMilliseconds({m.EffectiveConfig.TtlMs})");
         else
-        {
-            sb.AppendLine($"        _cache.Set(__key, __result, global::System.TimeSpan.FromMilliseconds({m.EffectiveConfig.TtlMs}));");
-        }
+            sb.Append($"            {{ AbsoluteExpirationRelativeToNow = global::System.TimeSpan.FromMilliseconds({m.EffectiveConfig.TtlMs})");
+
+        if (isolated)
+            sb.AppendLine(", Size = 1 }");
+        else
+            sb.AppendLine(" }");
+
+        sb.AppendLine($"            .RegisterPostEvictionCallback(static (_, _, _, _) =>");
+        sb.AppendLine($"                _evictions.Add(1, new global::System.Collections.Generic.KeyValuePair<string, object?>(\"method\", \"{m.Name}\"))));");
     }
 
     private static void WriteHybridCachedMethod(StringBuilder sb, string interfaceName, CachedMethodModel m)
     {
+        // Note: HybridCache.GetOrCreateAsync does not expose a separate hit/miss path.
+        // We count _hybridCalls when the factory delegate is invoked (factory call = cache miss).
+        // Eviction callbacks via MemoryCacheEntryOptions do not apply to HybridCache.
         var fieldName = OptionsFieldName(m.Name);
-
         var ctName = m.CancellationTokenParamName ?? "ct";
-
-        string state;
-        string lambda;
-        if (m.KeyParams.IsEmpty)
-        {
-            state = "_inner";
-            lambda = $"static async (inner, {ctName}) => await inner.{m.Name}({ctName}).ConfigureAwait(false)";
-        }
-        else
-        {
-            var combinedSb = new System.Text.StringBuilder();
-            var lambdaSb = new System.Text.StringBuilder();
-            bool first = true;
-            foreach (var kp in m.KeyParams)
-            {
-                if (!first) { combinedSb.Append(", "); lambdaSb.Append(", "); }
-                first = false;
-                combinedSb.Append(kp.Name).Append(": ").Append(kp.Name);
-                lambdaSb.Append("s.").Append(kp.Name);
-            }
-            state = $"(inner: _inner, {combinedSb})";
-
-            if (m.HasCancellationToken)
-            {
-                if (!first) lambdaSb.Append(", ");
-                lambdaSb.Append(ctName);
-            }
-            lambda = $"static async (s, {ctName}) => await s.inner.{m.Name}({lambdaSb}).ConfigureAwait(false)";
-        }
-
+        var (state, lambda) = BuildHybridStateAndLambda(m, ctName);
         var ctArg = m.HasCancellationToken ? m.CancellationTokenParamName : "default";
+        var cacheMethodTag = $"{interfaceName}.{m.Name}";
 
-        sb.AppendLine($"    public {m.ReturnTypeFqn} {m.Name}({m.ParameterList})");
+        // Method is emitted async so the activity scope spans the entire lookup. The original
+        // shape was a sync method that returned the ValueTask directly; switching to async keeps
+        // the same external contract but lets `using var __activity` and the duration capture
+        // observe completion.
+        sb.AppendLine($"    public async {m.ReturnTypeFqn} {m.Name}({m.ParameterList})");
         sb.AppendLine("    {");
-        sb.AppendLine("        return _hybridCache.GetOrCreateAsync(");
-        sb.AppendLine($"            $\"{interfaceName}.{m.Name}{m.KeyArguments}\",");
-        sb.AppendLine($"            {state},");
-        sb.AppendLine($"            {lambda},");
-        sb.AppendLine($"            {fieldName},");
-        sb.AppendLine($"            cancellationToken: {ctArg});");
+        sb.AppendLine($"        using var __activity = _activitySource.StartActivity(\"cache.lookup\");");
+        sb.AppendLine($"        __activity?.SetTag(\"cache.method\", \"{cacheMethodTag}\");");
+        sb.AppendLine($"        __activity?.SetTag(\"cache.tier\", \"L2\");");
+        sb.AppendLine($"        var __sw = global::System.Diagnostics.Stopwatch.GetTimestamp();");
+        sb.AppendLine($"        try");
+        sb.AppendLine($"        {{");
+        sb.AppendLine($"            return await _hybridCache.GetOrCreateAsync(");
+        sb.AppendLine($"                $\"{interfaceName}.{m.Name}{m.KeyArguments}\",");
+        sb.AppendLine($"                {state},");
+        sb.AppendLine($"                {lambda},");
+        sb.AppendLine($"                {fieldName},");
+        sb.AppendLine($"                cancellationToken: {ctArg}).ConfigureAwait(false);");
+        sb.AppendLine($"        }}");
+        sb.AppendLine($"        finally");
+        sb.AppendLine($"        {{");
+        sb.AppendLine($"            _lookupDurationMs.Record(global::System.Diagnostics.Stopwatch.GetElapsedTime(__sw).TotalMilliseconds,");
+        sb.AppendLine($"                new global::System.Collections.Generic.KeyValuePair<string, object?>(\"cache.method\", \"{cacheMethodTag}\"));");
+        sb.AppendLine($"        }}");
         sb.AppendLine("    }");
         sb.AppendLine();
+    }
+
+    private static (string State, string Lambda) BuildHybridStateAndLambda(CachedMethodModel m, string ctName)
+    {
+        var methodTag = $"new global::System.Collections.Generic.KeyValuePair<string, object?>(\"method\", \"{m.Name}\")";
+        if (m.KeyParams.IsEmpty)
+        {
+            return (
+                "_inner",
+                $"static async (inner, {ctName}) => {{ _hybridCalls.Add(1, {methodTag}); return await inner.{m.Name}({ctName}).ConfigureAwait(false); }}");
+        }
+
+        var combinedSb = new System.Text.StringBuilder();
+        var lambdaSb = new System.Text.StringBuilder();
+        bool first = true;
+        foreach (var kp in m.KeyParams)
+        {
+            if (!first) { combinedSb.Append(", "); lambdaSb.Append(", "); }
+            first = false;
+            combinedSb.Append(kp.Name).Append(": ").Append(kp.Name);
+            lambdaSb.Append("s.").Append(kp.Name);
+        }
+        var state = $"(inner: _inner, {combinedSb})";
+
+        if (m.HasCancellationToken)
+        {
+            if (!first) lambdaSb.Append(", ");
+            lambdaSb.Append(ctName);
+        }
+        var lambda = $"static async (s, {ctName}) => {{ _hybridCalls.Add(1, {methodTag}); return await s.inner.{m.Name}({lambdaSb}).ConfigureAwait(false); }}";
+        return (state, lambda);
     }
 
     private static void WritePassthroughMethod(StringBuilder sb, PassthroughMethodModel m)

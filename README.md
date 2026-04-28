@@ -67,6 +67,37 @@ public class ProductsController(IProductRepository repo)
 
 ---
 
+## Telemetry
+
+Each cached method emits both metrics (via `Meter("ZeroAlloc.Cache")`) and a tracing span (via `ActivitySource("ZeroAlloc.Cache")`) — no extra package required, plain BCL `System.Diagnostics`.
+
+> **Breaking change in 2.0:** `Meter` name renamed from `"zeroalloc.cache"` to `"ZeroAlloc.Cache"` for ecosystem consistency with the other ZeroAlloc telemetry packages. Subscribers must update — calls to `AddMeter("zeroalloc.cache")` will silently stop receiving metrics:
+>
+> ```diff
+> -services.AddOpenTelemetry().WithMetrics(m => m.AddMeter("zeroalloc.cache"));
+> +services.AddOpenTelemetry().WithMetrics(m => m.AddMeter("ZeroAlloc.Cache"));
+> ```
+
+**Metrics.** Counters tagged with `method` (the cached method name): `cache.hits`, `cache.misses`, `cache.evictions`, `cache.hybrid_calls` (factory invocations on the HybridCache path). The `cache.lookup_duration_ms` histogram records per-lookup latency tagged with `cache.method`.
+
+**Tracing.** Each cached method emits a `cache.lookup` span tagged with:
+
+| Tag | Value | Notes |
+|-----|-------|-------|
+| `cache.method` | `"Interface.Method"` | Compile-time constant per emitted method |
+| `cache.tier` | `"L1"` or `"L2"` | `L1` = in-process `MemoryCache`; `L2` = `HybridCache` |
+| `cache.hit` | `true` / `false` | L1 only — `HybridCache` hides per-call hit/miss state, so this tag is omitted on the L2 path |
+
+Subscribe via OpenTelemetry:
+
+```csharp
+services.AddOpenTelemetry()
+    .WithMetrics(m => m.AddMeter("ZeroAlloc.Cache"))
+    .WithTracing(t => t.AddSource("ZeroAlloc.Cache"));
+```
+
+---
+
 ## Diagnostics
 
 | ID | Severity | Description |
