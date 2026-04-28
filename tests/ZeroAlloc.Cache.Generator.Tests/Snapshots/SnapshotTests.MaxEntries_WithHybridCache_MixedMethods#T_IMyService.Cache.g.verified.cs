@@ -3,6 +3,7 @@
 #nullable enable
 
 using Microsoft.Extensions.Caching.Memory;
+using Microsoft.Extensions.Caching.Hybrid;
 using Microsoft.Extensions.DependencyInjection;
 
 using System.Diagnostics;
