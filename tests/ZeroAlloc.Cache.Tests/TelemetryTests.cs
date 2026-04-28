@@ -97,7 +97,7 @@ public sealed class TelemetryTests
         await proxy.GetAsync("any", CancellationToken.None);
 
         recorded.Should().NotBeEmpty();
-        recorded[0].Value.Should().BeGreaterOrEqualTo(0.0);
+        (recorded[0].Value >= 0.0).Should().BeTrue();
         recorded[0].Tags.Should().ContainKey("cache.method")
             .WhoseValue.Should().Be("ITestService.GetAsync");
     }
