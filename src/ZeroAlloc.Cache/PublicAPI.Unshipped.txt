@@ -1,0 +1,11 @@
+#nullable enable
+ZeroAlloc.Cache.CacheAttribute
+ZeroAlloc.Cache.CacheAttribute.CacheAttribute() -> void
+ZeroAlloc.Cache.CacheAttribute.MaxEntries.get -> int
+ZeroAlloc.Cache.CacheAttribute.MaxEntries.init -> void
+ZeroAlloc.Cache.CacheAttribute.Sliding.get -> bool
+ZeroAlloc.Cache.CacheAttribute.Sliding.init -> void
+ZeroAlloc.Cache.CacheAttribute.TtlMs.get -> int
+ZeroAlloc.Cache.CacheAttribute.TtlMs.init -> void
+ZeroAlloc.Cache.CacheAttribute.UseHybridCache.get -> bool
+ZeroAlloc.Cache.CacheAttribute.UseHybridCache.init -> void

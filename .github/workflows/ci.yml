@@ -86,3 +86,9 @@ jobs:
 
       - name: Run AOT binary
         run: ./aot-out/ZeroAlloc.Cache.AotSmoke
+
+  api-compat:
+    uses: ZeroAlloc-Net/.github/.github/workflows/api-compat.yml@main
+    with:
+      package-id: ZeroAlloc.Cache
+      csproj-path: src/ZeroAlloc.Cache/ZeroAlloc.Cache.csproj
