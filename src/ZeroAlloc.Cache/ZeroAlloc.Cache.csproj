@@ -16,6 +16,12 @@
     <PackageReference Include="Microsoft.Extensions.DependencyInjection.Abstractions" Version="9.0.3" />
     <PackageReference Include="Microsoft.Extensions.Caching.Hybrid" Version="9.3.0" />
   </ItemGroup>
+  <!--
+    Bundle the source generator into the NuGet package so consumers get it by
+    referencing only ZeroAlloc.Cache. The standalone ZeroAlloc.Cache.Generator
+    package is still published for backwards compatibility, but new consumers
+    should reference the main package only.
+  -->
   <ItemGroup>
     <ProjectReference
       Include="..\ZeroAlloc.Cache.Generator\ZeroAlloc.Cache.Generator.csproj"
@@ -23,4 +29,12 @@
       ReferenceOutputAssembly="false"
       PrivateAssets="all" />
   </ItemGroup>
+  <Target Name="IncludeGeneratorInPackage" BeforeTargets="_GetPackageFiles">
+    <ItemGroup>
+      <None Include="$(MSBuildThisFileDirectory)..\ZeroAlloc.Cache.Generator\bin\$(Configuration)\netstandard2.0\ZeroAlloc.Cache.Generator.dll"
+            Pack="true"
+            PackagePath="analyzers/dotnet/cs"
+            Visible="false" />
+    </ItemGroup>
+  </Target>
 </Project>
