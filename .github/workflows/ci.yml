@@ -51,14 +51,6 @@ jobs:
           -c Release -p:Version=${{ steps.gitversion.outputs.semver }}
           --no-build -o ./artifacts
 
-      - name: Push to NuGet
-        if: github.ref == 'refs/heads/main' && github.event_name == 'push'
-        run: |
-          dotnet nuget push ./artifacts/*.nupkg \
-            --source https://api.nuget.org/v3/index.json \
-            --api-key ${{ secrets.NUGET_API_KEY }} \
-            --skip-duplicate
-
   aot-smoke:
     runs-on: ubuntu-latest
     # Publishes samples/ZeroAlloc.Cache.AotSmoke with PublishAot=true. The
