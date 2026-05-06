@@ -4,6 +4,19 @@ All notable changes to this project are documented here. The format is based on
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the project follows
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.1](https://github.com/ZeroAlloc-Net/ZeroAlloc.Cache/compare/v1.0.0...v1.0.1) (2026-05-06)
+
+
+### CI
+
+* **release-please:** use RELEASE_PLEASE_TOKEN to trigger downstream CI ([#38](https://github.com/ZeroAlloc-Net/ZeroAlloc.Cache/issues/38)) ([7e7d8d3](https://github.com/ZeroAlloc-Net/ZeroAlloc.Cache/commit/7e7d8d303a934b4fe0e0cd2f19c378c53908d48b))
+
+
+### Chores
+
+* **deps:** update dependency xunit.runner.visualstudio to v3 ([#36](https://github.com/ZeroAlloc-Net/ZeroAlloc.Cache/issues/36)) ([0c8f777](https://github.com/ZeroAlloc-Net/ZeroAlloc.Cache/commit/0c8f777ca5b01016987e225f369f1d2d082159b8))
+* **deps:** update microsoft.extensions ([#35](https://github.com/ZeroAlloc-Net/ZeroAlloc.Cache/issues/35)) ([c25848d](https://github.com/ZeroAlloc-Net/ZeroAlloc.Cache/commit/c25848d1bbf24087cdff1e5c6b0f29116dc66183))
+
 ## [1.0.0](https://github.com/ZeroAlloc-Net/ZeroAlloc.Cache/compare/v0.0.1...v1.0.0) (2026-05-04)
 
 
