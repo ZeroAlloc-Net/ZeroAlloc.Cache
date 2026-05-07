@@ -4,6 +4,13 @@ All notable changes to this project are documented here. The format is based on
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the project follows
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.2](https://github.com/ZeroAlloc-Net/ZeroAlloc.Cache/compare/v1.0.1...v1.0.2) (2026-05-07)
+
+
+### CI
+
+* add publish-from-manifest rescue workflow ([#39](https://github.com/ZeroAlloc-Net/ZeroAlloc.Cache/issues/39)) ([2dc7ef4](https://github.com/ZeroAlloc-Net/ZeroAlloc.Cache/commit/2dc7ef43c6de47e031c4ba3cf71fcf7393535ae6))
+
 ## [1.0.1](https://github.com/ZeroAlloc-Net/ZeroAlloc.Cache/compare/v1.0.0...v1.0.1) (2026-05-06)
 
 
