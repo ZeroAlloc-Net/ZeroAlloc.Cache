@@ -4,6 +4,13 @@ All notable changes to this project are documented here. The format is based on
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the project follows
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.1.0](https://github.com/ZeroAlloc-Net/ZeroAlloc.Cache/compare/v1.0.5...v1.1.0) (2026-05-13)
+
+
+### Features
+
+* **benchmarks:** add FusionCache + raw IMemoryCache as L1 competitors ([#49](https://github.com/ZeroAlloc-Net/ZeroAlloc.Cache/issues/49)) ([92e665a](https://github.com/ZeroAlloc-Net/ZeroAlloc.Cache/commit/92e665a587a6071454f38fa1075143fac0d1fa58))
+
 ## [1.0.5](https://github.com/ZeroAlloc-Net/ZeroAlloc.Cache/compare/v1.0.4...v1.0.5) (2026-05-12)
 
 
