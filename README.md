@@ -44,6 +44,20 @@ public class ProductsController(IProductRepository repo)
 
 ---
 
+## Performance
+
+L1 (in-process) cache-hit comparison. .NET 10.0.7, i9-12900HK, BenchmarkDotNet v0.15.8.
+
+| Library | Time | Allocated |
+|---|---:|---:|
+| Raw `IMemoryCache.GetOrCreateAsync` | 208 ns | 176 B |
+| **ZA.Cache proxy** | **434 ns** | **160 B** |
+| FusionCache | 989 ns | 112 B |
+
+ZA.Cache is **2.3× faster than FusionCache** with comparable allocation. The ~2× premium over hand-rolled `IMemoryCache.GetOrCreateAsync` is the cost of the typed `[Cache]` attribute abstraction (generated key building + async wrapper) — in exchange you don't write the lookup boilerplate at every call site. FusionCache's overhead comes from carrying L2-cache and stampede-protection infrastructure even when only L1 is configured.
+
+Full methodology + design analysis: [docs/performance.md](https://github.com/ZeroAlloc-Net/ZeroAlloc.Cache/blob/main/docs/performance.md).
+
 ## Features
 
 | Feature | Notes |

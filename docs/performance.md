@@ -26,9 +26,29 @@ The generator calls `IMemoryCache.TryGetValue<T>(key, out T value)` — a generi
 
 Every method accepting a `CancellationToken` has that parameter skipped when the key is composed — tokens are identity-comparable across requests, which would balloon cache entries. This is baked into the generator, not a runtime switch.
 
-## Benchmark
+## Head-to-head vs Raw IMemoryCache and FusionCache
 
-The [benchmarks/ZeroAlloc.Cache.Benchmarks](https://github.com/ZeroAlloc-Net/ZeroAlloc.Cache/tree/main/benchmarks/ZeroAlloc.Cache.Benchmarks) project contains a single representative measurement: `CachedLookupBenchmark`. It compares:
+<!-- BENCH:START -->
+_Last refreshed: 2026-05-13_
+
+L1 (in-process) cache-hit comparison. .NET 10.0.7, i9-12900HK, BenchmarkDotNet v0.15.8. ZA.Cache wraps `IMemoryCache`, so the relevant comparisons are: hand-rolled `GetOrCreateAsync` (the pattern ZA replaces) and [FusionCache](https://github.com/ZiggyCreatures/FusionCache) 2.0 (the de-facto third-party L1+L2 caching library).
+
+| Library | Time | Allocated |
+|---|---:|---:|
+| Raw `IMemoryCache.GetOrCreateAsync` | 208 ns | 176 B |
+| **ZA.Cache proxy** | **434 ns** | **160 B** |
+| FusionCache | 989 ns | 112 B |
+
+**ZA.Cache is 2.3× faster than FusionCache** with comparable allocation. The trade vs raw `IMemoryCache` is the ~2× cost of the typed `[Cache]` attribute abstraction (compile-time key building + async wrapper) — in exchange you don't write the cache-lookup boilerplate at every call site, and the key derivation is generated rather than hand-typed.
+
+**FusionCache** is heavier because it carries L2-cache, stampede protection, and adaptive-caching infrastructure even when only L1 is configured. For pure L1, ZA is the lighter choice; FusionCache's value is the L2 + advanced features that ZA does not implement.
+
+**Caveat on the raw row**: ZA's 2× premium over raw `IMemoryCache.GetOrCreateAsync` reflects the proxy dispatch + generated key composition. The raw row's 176 B allocation is the `(string, int)` tuple boxing the test uses for the key; ZA's 160 B is the generated `customer-42` string interpolation. Allocation parity is by design — both store roughly the same key shape.
+<!-- BENCH:END -->
+
+## Self-benchmark
+
+The [benchmarks/ZeroAlloc.Cache.Benchmarks](https://github.com/ZeroAlloc-Net/ZeroAlloc.Cache/tree/main/benchmarks/ZeroAlloc.Cache.Benchmarks) project also contains `CachedLookupBenchmark` — the original direct-vs-proxied baseline. It compares:
 
 - **Baseline**: direct call on the underlying `ICustomerService` implementation (no caching)
 - **Proxied (cache hit)**: the generator-emitted `ICustomerServiceCacheProxy` wrapping `MemoryCache`, pre-warmed so every measured call is a hit
