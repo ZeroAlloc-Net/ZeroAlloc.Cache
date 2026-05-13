@@ -12,6 +12,7 @@
   <ItemGroup>
     <PackageReference Include="BenchmarkDotNet" Version="0.15.8" />
     <PackageReference Include="Microsoft.Extensions.Caching.Memory" Version="10.0.7" />
+    <PackageReference Include="ZiggyCreatures.FusionCache" Version="2.0.0" />
 
     <ProjectReference Include="..\..\src\ZeroAlloc.Cache\ZeroAlloc.Cache.csproj" />
     <ProjectReference Include="..\..\src\ZeroAlloc.Cache.Generator\ZeroAlloc.Cache.Generator.csproj"
