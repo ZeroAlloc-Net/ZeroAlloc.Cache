@@ -4,6 +4,14 @@ All notable changes to this project are documented here. The format is based on
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the project follows
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.1.1](https://github.com/ZeroAlloc-Net/ZeroAlloc.Cache/compare/v1.1.0...v1.1.1) (2026-05-18)
+
+
+### Chores
+
+* **deps:** update dependency fluentassertions to 8.10.0 ([#51](https://github.com/ZeroAlloc-Net/ZeroAlloc.Cache/issues/51)) ([61b02a8](https://github.com/ZeroAlloc-Net/ZeroAlloc.Cache/commit/61b02a85ee62e1a8b5c317107a3730fcf3122761))
+* **deps:** update dependency ziggycreatures.fusioncache to 2.6.0 ([#52](https://github.com/ZeroAlloc-Net/ZeroAlloc.Cache/issues/52)) ([f199bfa](https://github.com/ZeroAlloc-Net/ZeroAlloc.Cache/commit/f199bfa485e83ae48a5e57536afc92e4d4976a97))
+
 ## [1.1.0](https://github.com/ZeroAlloc-Net/ZeroAlloc.Cache/compare/v1.0.5...v1.1.0) (2026-05-13)
 
 
