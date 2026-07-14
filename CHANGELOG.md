@@ -4,6 +4,13 @@ All notable changes to this project are documented here. The format is based on
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the project follows
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.1.14](https://github.com/ZeroAlloc-Net/ZeroAlloc.Cache/compare/v1.1.13...v1.1.14) (2026-07-14)
+
+
+### Chores
+
+* **deps:** update dependency gitversion.tool to v6.8.2 ([#83](https://github.com/ZeroAlloc-Net/ZeroAlloc.Cache/issues/83)) ([86e1322](https://github.com/ZeroAlloc-Net/ZeroAlloc.Cache/commit/86e13223db5432544de442dd8e0e04822b2b0f44))
+
 ## [1.1.13](https://github.com/ZeroAlloc-Net/ZeroAlloc.Cache/compare/v1.1.12...v1.1.13) (2026-07-08)
 
 
