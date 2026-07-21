@@ -4,6 +4,13 @@ All notable changes to this project are documented here. The format is based on
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the project follows
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.1.16](https://github.com/ZeroAlloc-Net/ZeroAlloc.Cache/compare/v1.1.15...v1.1.16) (2026-07-21)
+
+
+### Bug Fixes
+
+* **generator:** gate emit on [Cache] and always emit the DI using ([#88](https://github.com/ZeroAlloc-Net/ZeroAlloc.Cache/issues/88)) ([ad5d433](https://github.com/ZeroAlloc-Net/ZeroAlloc.Cache/commit/ad5d4332f971f65d42f80abbad8fd334fe24ed77)), closes [#87](https://github.com/ZeroAlloc-Net/ZeroAlloc.Cache/issues/87)
+
 ## [1.1.15](https://github.com/ZeroAlloc-Net/ZeroAlloc.Cache/compare/v1.1.14...v1.1.15) (2026-07-20)
 
 
