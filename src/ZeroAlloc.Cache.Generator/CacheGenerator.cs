@@ -10,8 +10,7 @@ public sealed class CacheGenerator : IIncrementalGenerator
     {
         var models = context.SyntaxProvider
             .CreateSyntaxProvider(
-                predicate: static (node, _) =>
-                    node is InterfaceDeclarationSyntax { AttributeLists.Count: > 0 },
+                predicate: static (node, _) => IsCandidateInterface(node),
                 transform: static (ctx, ct) => TryParse(ctx, ct))
             .Where(static m => m is not null)
             .Select(static (m, _) => m!);
@@ -31,6 +30,26 @@ public sealed class CacheGenerator : IIncrementalGenerator
         });
     }
 
+    /// <summary>
+    /// Cheap syntax-only shortlist: an interface carrying an attribute on itself or on one of its
+    /// members. Whether that attribute is actually <c>[Cache]</c> is decided semantically in
+    /// <see cref="TryParse"/>.
+    /// </summary>
+    private static bool IsCandidateInterface(SyntaxNode node)
+    {
+        if (node is not InterfaceDeclarationSyntax iface)
+            return false;
+        if (iface.AttributeLists.Count > 0)
+            return true;
+
+        foreach (var member in iface.Members)
+        {
+            if (member.AttributeLists.Count > 0)
+                return true;
+        }
+        return false;
+    }
+
     private static CacheModel? TryParse(
         GeneratorSyntaxContext ctx,
         System.Threading.CancellationToken ct)
@@ -45,6 +64,12 @@ public sealed class CacheGenerator : IIncrementalGenerator
 
         var ifaceAttr = FindCacheAttr(symbol);
         var ifaceConfig = ifaceAttr != null ? ReadConfig(ifaceAttr) : null;
+
+        // Opt-in gate: the syntax predicate only knows "interface with some attribute", so an
+        // interface carrying unrelated attributes still lands here. Emit nothing unless [Cache]
+        // is actually present on the interface or on one of its methods.
+        if (ifaceAttr == null && !HasMethodLevelCacheAttr(symbol, ct))
+            return null;
 
         var cachedMethods = new System.Collections.Generic.List<CachedMethodModel>();
         var passthroughMethods = new System.Collections.Generic.List<PassthroughMethodModel>();
@@ -67,12 +92,7 @@ public sealed class CacheGenerator : IIncrementalGenerator
             ? symbol.Name
             : symbol.ContainingNamespace.ToDisplayString() + "." + symbol.Name;
 
-        // v1: all isolated methods share a single MemoryCache with SizeLimit = first MaxEntries > 0 value.
-        int isolatedCacheMaxEntries = 0;
-        for (int i = 0; i < cachedMethods.Count; i++)
-        {
-            if (cachedMethods[i].EffectiveConfig.MaxEntries > 0) { isolatedCacheMaxEntries = cachedMethods[i].EffectiveConfig.MaxEntries; break; }
-        }
+        var isolatedCacheMaxEntries = FirstMaxEntries(cachedMethods);
 
         CheckMixedMaxEntries(symbol, cachedMethods, isolatedCacheMaxEntries, diagnostics);
         CheckHybridCacheAvailability(ctx, symbol, cachedMethods, diagnostics);
@@ -89,6 +109,33 @@ public sealed class CacheGenerator : IIncrementalGenerator
             System.Collections.Immutable.ImmutableArray.CreateRange(passthroughMethods),
             System.Collections.Immutable.ImmutableArray.CreateRange(diagnostics)
         );
+    }
+
+    /// <summary>
+    /// v1: all isolated methods share a single MemoryCache with SizeLimit = first MaxEntries &gt; 0 value.
+    /// </summary>
+    private static int FirstMaxEntries(System.Collections.Generic.List<CachedMethodModel> cachedMethods)
+    {
+        for (int i = 0; i < cachedMethods.Count; i++)
+        {
+            if (cachedMethods[i].EffectiveConfig.MaxEntries > 0)
+                return cachedMethods[i].EffectiveConfig.MaxEntries;
+        }
+        return 0;
+    }
+
+    private static bool HasMethodLevelCacheAttr(
+        INamedTypeSymbol symbol,
+        System.Threading.CancellationToken ct)
+    {
+        foreach (var member in symbol.GetMembers())
+        {
+            ct.ThrowIfCancellationRequested();
+            if (member is IMethodSymbol { MethodKind: MethodKind.Ordinary } method
+                && FindCacheAttr(method) != null)
+                return true;
+        }
+        return false;
     }
 
     private static void ParseMember(

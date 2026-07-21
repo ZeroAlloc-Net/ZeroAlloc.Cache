@@ -16,7 +16,6 @@ internal static class CacheWriter
         sb.AppendLine();
 
         // Extension-method usings: global:: qualifies type names but NOT extension methods.
-        bool emitDiUsing = model.AnyMethodUsesIMemoryCache || model.AnyMethodUsesIsolatedCache || model.AnyMethodUsesHybridCache;
         if (model.AnyMethodUsesIMemoryCache || model.AnyMethodUsesIsolatedCache)
         {
             sb.AppendLine("using Microsoft.Extensions.Caching.Memory;");
@@ -26,12 +25,11 @@ internal static class CacheWriter
             // AddHybridCache() is an extension on IServiceCollection in Microsoft.Extensions.Caching.Hybrid.
             sb.AppendLine("using Microsoft.Extensions.Caching.Hybrid;");
         }
-        if (emitDiUsing)
-        {
-            // AddTransient/AddMemoryCache extension methods.
-            sb.AppendLine("using Microsoft.Extensions.DependencyInjection;");
-            sb.AppendLine();
-        }
+        // AddTransient/AddMemoryCache extension methods. Unconditional: the DI extension is always
+        // emitted, including for a proxy whose methods are all passthrough, so gating this on cache
+        // usage leaves AddTransient/GetRequiredService unresolved (CS1061).
+        sb.AppendLine("using Microsoft.Extensions.DependencyInjection;");
+        sb.AppendLine();
 
         bool anyNonHybridCached = false;
         bool anyHybridCachedMethod = false;
