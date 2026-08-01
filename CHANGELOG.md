@@ -4,6 +4,13 @@ All notable changes to this project are documented here. The format is based on
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the project follows
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.1.19](https://github.com/ZeroAlloc-Net/ZeroAlloc.Cache/compare/v1.1.18...v1.1.19) (2026-07-31)
+
+
+### Chores
+
+* **deps:** update dependency meziantou.analyzer to 3.0.137 ([#96](https://github.com/ZeroAlloc-Net/ZeroAlloc.Cache/issues/96)) ([a7a0bbd](https://github.com/ZeroAlloc-Net/ZeroAlloc.Cache/commit/a7a0bbd6e03b1844c347c12cd213c71524deed5f))
+
 ## [1.1.18](https://github.com/ZeroAlloc-Net/ZeroAlloc.Cache/compare/v1.1.17...v1.1.18) (2026-07-25)
 
 
