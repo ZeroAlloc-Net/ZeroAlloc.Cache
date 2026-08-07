@@ -4,6 +4,13 @@ All notable changes to this project are documented here. The format is based on
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the project follows
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.1.21](https://github.com/ZeroAlloc-Net/ZeroAlloc.Cache/compare/v1.1.20...v1.1.21) (2026-08-07)
+
+
+### Chores
+
+* **renovate:** adopt the shared preset, drop the weekly window ([#100](https://github.com/ZeroAlloc-Net/ZeroAlloc.Cache/issues/100)) ([cab5305](https://github.com/ZeroAlloc-Net/ZeroAlloc.Cache/commit/cab5305e1bb4c29eb2e199c16afd8e5d5094c4f4))
+
 ## [1.1.20](https://github.com/ZeroAlloc-Net/ZeroAlloc.Cache/compare/v1.1.19...v1.1.20) (2026-08-04)
 
 
