@@ -4,6 +4,13 @@ All notable changes to this project are documented here. The format is based on
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the project follows
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.1.23](https://github.com/ZeroAlloc-Net/ZeroAlloc.Cache/compare/v1.1.22...v1.1.23) (2026-08-09)
+
+
+### Chores
+
+* **deps:** replace FluentAssertions with AwesomeAssertions ([#104](https://github.com/ZeroAlloc-Net/ZeroAlloc.Cache/issues/104)) ([23528ff](https://github.com/ZeroAlloc-Net/ZeroAlloc.Cache/commit/23528ff32d65143c68bc53458d023c16465045fc))
+
 ## [1.1.22](https://github.com/ZeroAlloc-Net/ZeroAlloc.Cache/compare/v1.1.21...v1.1.22) (2026-08-07)
 
 
