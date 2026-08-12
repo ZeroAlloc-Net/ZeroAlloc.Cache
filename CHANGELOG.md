@@ -4,6 +4,13 @@ All notable changes to this project are documented here. The format is based on
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the project follows
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.1.24](https://github.com/ZeroAlloc-Net/ZeroAlloc.Cache/compare/v1.1.23...v1.1.24) (2026-08-12)
+
+
+### Chores
+
+* **deps:** update dependency roslynator.analyzers to 4.16.0 ([#106](https://github.com/ZeroAlloc-Net/ZeroAlloc.Cache/issues/106)) ([fdb97e8](https://github.com/ZeroAlloc-Net/ZeroAlloc.Cache/commit/fdb97e83d6b102f44f41c9ba5fc17b8fcc8ddc43))
+
 ## [1.1.23](https://github.com/ZeroAlloc-Net/ZeroAlloc.Cache/compare/v1.1.22...v1.1.23) (2026-08-09)
 
 
