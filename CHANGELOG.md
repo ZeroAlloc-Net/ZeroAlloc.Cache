@@ -4,6 +4,13 @@ All notable changes to this project are documented here. The format is based on
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the project follows
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.1.29](https://github.com/ZeroAlloc-Net/ZeroAlloc.Cache/compare/v1.1.28...v1.1.29) (2026-08-19)
+
+
+### Chores
+
+* **deps:** update dependency xunit.runner.visualstudio to v4 ([#116](https://github.com/ZeroAlloc-Net/ZeroAlloc.Cache/issues/116)) ([2dba516](https://github.com/ZeroAlloc-Net/ZeroAlloc.Cache/commit/2dba5169e0e86683cceba4b3061f69bc9458fce0))
+
 ## [1.1.28](https://github.com/ZeroAlloc-Net/ZeroAlloc.Cache/compare/v1.1.27...v1.1.28) (2026-08-17)
 
 
