@@ -4,6 +4,15 @@ All notable changes to this project are documented here. The format is based on
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the project follows
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.1.33](https://github.com/ZeroAlloc-Net/ZeroAlloc.Cache/compare/v1.1.32...v1.1.33) (2026-08-25)
+
+
+### Chores
+
+* **deps:** update dependency meziantou.analyzer to 3.0.177 ([#127](https://github.com/ZeroAlloc-Net/ZeroAlloc.Cache/issues/127)) ([b6494cf](https://github.com/ZeroAlloc-Net/ZeroAlloc.Cache/commit/b6494cfa5455ef47e288e98aa798b33e65bfb60f))
+* **deps:** update dependency roslynator.analyzers to v5 ([#130](https://github.com/ZeroAlloc-Net/ZeroAlloc.Cache/issues/130)) ([7d80332](https://github.com/ZeroAlloc-Net/ZeroAlloc.Cache/commit/7d8033290ddbbd380239d2ac491b585a91db60c5))
+* **deps:** update dependency ziggycreatures.fusioncache to 2.7.1 ([#128](https://github.com/ZeroAlloc-Net/ZeroAlloc.Cache/issues/128)) ([c9eeca5](https://github.com/ZeroAlloc-Net/ZeroAlloc.Cache/commit/c9eeca5acef5678d511ff1f8a61a6652e1a568f6))
+
 ## [1.1.32](https://github.com/ZeroAlloc-Net/ZeroAlloc.Cache/compare/v1.1.31...v1.1.32) (2026-08-23)
 
 
