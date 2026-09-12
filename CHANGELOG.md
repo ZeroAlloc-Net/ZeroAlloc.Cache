@@ -4,6 +4,14 @@ All notable changes to this project are documented here. The format is based on
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the project follows
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.1.38](https://github.com/ZeroAlloc-Net/ZeroAlloc.Cache/compare/v1.1.37...v1.1.38) (2026-09-12)
+
+
+### Chores
+
+* **deps:** update dependency dotnet-sdk to v10.0.401 ([#139](https://github.com/ZeroAlloc-Net/ZeroAlloc.Cache/issues/139)) ([b80e04c](https://github.com/ZeroAlloc-Net/ZeroAlloc.Cache/commit/b80e04cd089e36482ba0a0c82c369b16d2f482b3))
+* **deps:** update dependency microsoft.net.test.sdk to 18.10.0 ([#140](https://github.com/ZeroAlloc-Net/ZeroAlloc.Cache/issues/140)) ([0b57ba4](https://github.com/ZeroAlloc-Net/ZeroAlloc.Cache/commit/0b57ba439c0ac246e4fd056cceaf27d4dc3fe14a))
+
 ## [1.1.37](https://github.com/ZeroAlloc-Net/ZeroAlloc.Cache/compare/v1.1.36...v1.1.37) (2026-09-07)
 
 
