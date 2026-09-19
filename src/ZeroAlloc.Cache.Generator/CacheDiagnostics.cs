@@ -33,6 +33,19 @@ internal static class CacheDiagnostics
         isEnabledByDefault: true
     );
 
+    /// <summary>
+    /// [Cache] on a method the generator cannot cache used to be silently ignored: the method was
+    /// classified passthrough and the inner implementation ran on every call, with nothing to tell
+    /// the author caching was never applied. See #121.
+    /// </summary>
+    public static readonly DiagnosticDescriptor CacheAttributeIgnored = new(
+        id: "ZC0005",
+        title: "[Cache] ignored — return type cannot be cached",
+        messageFormat: "Method '{0}' is marked [Cache] but returns '{1}', which has no cacheable value. Caching is not applied and the method is called every time. Return Task<T> or ValueTask<T> to enable caching.",
+        category: Category,
+        defaultSeverity: DiagnosticSeverity.Warning,
+        isEnabledByDefault: true);
+
     public static readonly DiagnosticDescriptor MixedMaxEntriesValues = new(
         id: "ZC0004",
         title: "Mixed MaxEntries values",

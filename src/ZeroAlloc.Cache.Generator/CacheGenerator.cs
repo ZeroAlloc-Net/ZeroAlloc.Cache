@@ -101,6 +101,7 @@ public sealed class CacheGenerator : IIncrementalGenerator
             ns,
             symbol.Name,
             ifaceFqn,
+            IsPubliclyAccessible(symbol),
             cachedMethods.Exists(static m => m.EffectiveConfig.UseHybridCache),
             cachedMethods.Exists(static m => !m.EffectiveConfig.UseHybridCache && m.EffectiveConfig.MaxEntries == 0),
             cachedMethods.Exists(static m => m.EffectiveConfig.MaxEntries > 0),
@@ -166,6 +167,18 @@ public sealed class CacheGenerator : IIncrementalGenerator
 
         if (isPassthrough)
         {
+            // An explicit [Cache] that cannot be honoured must say so. Silently emitting a
+            // passthrough left the author believing caching was active while the inner method
+            // ran on every call (#121).
+            if (methodAttr != null && isNonGenericReturn)
+            {
+                diagnostics.Add(Microsoft.CodeAnalysis.Diagnostic.Create(
+                    CacheDiagnostics.CacheAttributeIgnored,
+                    method.Locations.Length > 0 ? method.Locations[0] : Location.None,
+                    method.Name,
+                    method.ReturnType.ToDisplayString()));
+            }
+
             AddPassthrough(method, passthroughMethods, paramList, argList);
             return;
         }
@@ -284,23 +297,35 @@ public sealed class CacheGenerator : IIncrementalGenerator
         System.Collections.Generic.List<CachedMethodModel> cachedMethods)
     {
         string innerReturnFqn;
+        ITypeSymbol innerReturnSymbol;
         if (method.ReturnType is INamedTypeSymbol namedReturn
             && namedReturn.IsGenericType
             && namedReturn.TypeArguments.Length == 1)
         {
-            innerReturnFqn = namedReturn.TypeArguments[0]
-                .ToDisplayString(Microsoft.CodeAnalysis.SymbolDisplayFormat.FullyQualifiedFormat);
+            innerReturnSymbol = namedReturn.TypeArguments[0];
         }
         else
         {
-            innerReturnFqn = method.ReturnType
-                .ToDisplayString(Microsoft.CodeAnalysis.SymbolDisplayFormat.FullyQualifiedFormat);
+            innerReturnSymbol = method.ReturnType;
         }
+
+        innerReturnFqn = innerReturnSymbol
+            .ToDisplayString(Microsoft.CodeAnalysis.SymbolDisplayFormat.FullyQualifiedFormat);
+
+        // The cache-hit path declares `out T? __cached`. Two shapes need special handling:
+        // a struct T, because the null-forgiving operator cannot convert Nullable<T> back to T;
+        // and a T that is already nullable, because appending a second '?' does not parse.
+        bool innerIsValueType = innerReturnSymbol.IsValueType;
+        bool innerIsNullable =
+            innerReturnSymbol.NullableAnnotation == NullableAnnotation.Annotated
+            || (innerReturnSymbol is INamedTypeSymbol { OriginalDefinition.SpecialType: SpecialType.System_Nullable_T });
 
         cachedMethods.Add(new CachedMethodModel(
             method.Name,
             method.ReturnType.ToDisplayString(Microsoft.CodeAnalysis.SymbolDisplayFormat.FullyQualifiedFormat),
             innerReturnFqn,
+            innerIsValueType,
+            innerIsNullable,
             paramList,
             argList,
             keyArgs,
@@ -309,6 +334,21 @@ public sealed class CacheGenerator : IIncrementalGenerator
             System.Collections.Immutable.ImmutableArray.CreateRange(keyParams),
             effectiveConfig
         ));
+    }
+
+    /// <summary>
+    /// True when the type and every type containing it are public, so generated members that
+    /// reference it may themselves be public. A nested public type inside an internal type is
+    /// not publicly reachable, hence the walk up the containing chain.
+    /// </summary>
+    private static bool IsPubliclyAccessible(INamedTypeSymbol symbol)
+    {
+        for (INamedTypeSymbol? current = symbol; current is not null; current = current.ContainingType)
+        {
+            if (current.DeclaredAccessibility != Accessibility.Public)
+                return false;
+        }
+        return true;
     }
 
     private static void CheckMixedMaxEntries(
