@@ -4,6 +4,13 @@ All notable changes to this project are documented here. The format is based on
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the project follows
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.1.42](https://github.com/ZeroAlloc-Net/ZeroAlloc.Cache/compare/v1.1.41...v1.1.42) (2026-09-19)
+
+
+### Bug Fixes
+
+* **ci:** stamp the assembly version when publishing from a manifest ([#148](https://github.com/ZeroAlloc-Net/ZeroAlloc.Cache/issues/148)) ([3e3f428](https://github.com/ZeroAlloc-Net/ZeroAlloc.Cache/commit/3e3f428021bb2b3b96c1f9e85a243e4314405af9))
+
 ## [1.1.41](https://github.com/ZeroAlloc-Net/ZeroAlloc.Cache/compare/v1.1.40...v1.1.41) (2026-09-18)
 
 
