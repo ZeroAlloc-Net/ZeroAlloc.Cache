@@ -5,7 +5,7 @@ namespace ZeroAlloc.Cache.Generator.Tests;
 public sealed class SnapshotTests
 {
     [Fact]
-    public Task InterfaceLevel_IMemoryCache_SingleMethod()
+    public void InterfaceLevel_IMemoryCache_SingleMethod()
     {
         var source = """
             using ZeroAlloc.Cache;
@@ -18,11 +18,11 @@ public sealed class SnapshotTests
                 ValueTask<string> GetAsync(string id, CancellationToken ct);
             }
             """;
-        return TestHelper.Verify(source);
+        TestHelper.Verify(source);
     }
 
     [Fact]
-    public Task InterfaceLevel_WithPassthrough_GeneratesProxy()
+    public void InterfaceLevel_WithPassthrough_GeneratesProxy()
     {
         var source = """
             using ZeroAlloc.Cache;
@@ -36,11 +36,11 @@ public sealed class SnapshotTests
                 ValueTask SaveAsync(string data, CancellationToken ct);
             }
             """;
-        return TestHelper.Verify(source);
+        TestHelper.Verify(source);
     }
 
     [Fact]
-    public Task MethodLevel_Override_ShadowsInterfaceLevel()
+    public void MethodLevel_Override_ShadowsInterfaceLevel()
     {
         var source = """
             using ZeroAlloc.Cache;
@@ -55,11 +55,11 @@ public sealed class SnapshotTests
                 ValueTask<string> GetBySlugAsync(string slug, CancellationToken ct);
             }
             """;
-        return TestHelper.Verify(source);
+        TestHelper.Verify(source);
     }
 
     [Fact]
-    public Task UseHybridCache_GeneratesHybridProxy()
+    public void UseHybridCache_GeneratesHybridProxy()
     {
         var source = """
             using ZeroAlloc.Cache;
@@ -72,11 +72,11 @@ public sealed class SnapshotTests
                 ValueTask<string> GetAsync(string id, CancellationToken ct);
             }
             """;
-        return TestHelper.Verify(source);
+        TestHelper.Verify(source);
     }
 
     [Fact]
-    public Task UseHybridCache_NoParams_GeneratesHybridProxy()
+    public void UseHybridCache_NoParams_GeneratesHybridProxy()
     {
         const string source = """
             using ZeroAlloc.Cache;
@@ -87,11 +87,11 @@ public sealed class SnapshotTests
                 System.Threading.Tasks.ValueTask<string> GetAsync(System.Threading.CancellationToken ct);
             }
             """;
-        return TestHelper.Verify(source);
+        TestHelper.Verify(source);
     }
 
     [Fact]
-    public Task Sliding_IMemoryCache_UsesMemoryCacheEntryOptions()
+    public void Sliding_IMemoryCache_UsesMemoryCacheEntryOptions()
     {
         const string source = """
             using ZeroAlloc.Cache;
@@ -104,11 +104,11 @@ public sealed class SnapshotTests
                 ValueTask<string> GetAsync(string id, CancellationToken ct);
             }
             """;
-        return TestHelper.Verify(source);
+        TestHelper.Verify(source);
     }
 
     [Fact]
-    public Task MaxEntries_UsesIsolatedMemoryCache()
+    public void MaxEntries_UsesIsolatedMemoryCache()
     {
         const string source = """
             using ZeroAlloc.Cache;
@@ -121,11 +121,11 @@ public sealed class SnapshotTests
                 ValueTask<string> GetAsync(string id, CancellationToken ct);
             }
             """;
-        return TestHelper.Verify(source);
+        TestHelper.Verify(source);
     }
 
     [Fact]
-    public Task MaxEntries_WithHybridCache_MixedMethods()
+    public void MaxEntries_WithHybridCache_MixedMethods()
     {
         const string source = """
             using ZeroAlloc.Cache;
@@ -140,11 +140,11 @@ public sealed class SnapshotTests
                 ValueTask<string> FindAsync(string query, CancellationToken ct);
             }
             """;
-        return TestHelper.Verify(source);
+        TestHelper.Verify(source);
     }
 
     [Fact]
-    public Task Sliding_WithMaxEntries_UsesSlidingExpirationAndSize()
+    public void Sliding_WithMaxEntries_UsesSlidingExpirationAndSize()
     {
         const string source = """
             using ZeroAlloc.Cache;
@@ -157,11 +157,11 @@ public sealed class SnapshotTests
                 ValueTask<string> GetAsync(string id, CancellationToken ct);
             }
             """;
-        return TestHelper.Verify(source);
+        TestHelper.Verify(source);
     }
 
     [Fact]
-    public Task GlobalNamespace_GeneratesProxy()
+    public void GlobalNamespace_GeneratesProxy()
     {
         const string source = """
             using ZeroAlloc.Cache;
@@ -173,11 +173,11 @@ public sealed class SnapshotTests
                 ValueTask<string> GetAsync(int id, CancellationToken ct);
             }
             """;
-        return TestHelper.Verify(source);
+        TestHelper.Verify(source);
     }
 
     [Fact]
-    public Task PurePassthrough_AllNonGenericReturns_GeneratesProxy()
+    public void PurePassthrough_AllNonGenericReturns_GeneratesProxy()
     {
         const string source = """
             using ZeroAlloc.Cache;
@@ -191,6 +191,6 @@ public sealed class SnapshotTests
                 ValueTask DeleteAsync(int id, CancellationToken ct);
             }
             """;
-        return TestHelper.Verify(source);
+        TestHelper.Verify(source);
     }
 }
