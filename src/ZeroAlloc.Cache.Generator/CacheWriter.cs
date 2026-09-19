@@ -223,14 +223,23 @@ internal static class CacheWriter
         sb.AppendLine($"        __activity?.SetTag(\"cache.method\", \"{cacheMethodTag}\");");
         sb.AppendLine($"        var __sw = global::System.Diagnostics.Stopwatch.GetTimestamp();");
         sb.AppendLine($"        var __key = $\"{interfaceName}.{m.Name}{m.KeyArguments}\";");
-        sb.AppendLine($"        if (_cache.TryGetValue(__key, out {m.InnerReturnTypeFqn}? __cached))");
+        // `T?` for a struct T is Nullable<T>; appending '?' to an already-nullable T would emit
+        // `int??`, which does not parse. See #122.
+        var cachedDeclType = m.InnerIsNullable ? m.InnerReturnTypeFqn : $"{m.InnerReturnTypeFqn}?";
+        sb.AppendLine($"        if (_cache.TryGetValue(__key, out {cachedDeclType} __cached))");
         sb.AppendLine("        {");
         sb.AppendLine($"            _hits.Add(1, new global::System.Collections.Generic.KeyValuePair<string, object?>(\"method\", \"{m.Name}\"));");
         sb.AppendLine($"            __activity?.SetTag(\"cache.tier\", \"L1\");");
         sb.AppendLine($"            __activity?.SetTag(\"cache.hit\", true);");
         sb.AppendLine($"            _lookupDurationMs.Record(global::System.Diagnostics.Stopwatch.GetElapsedTime(__sw).TotalMilliseconds,");
         sb.AppendLine($"                new global::System.Collections.Generic.KeyValuePair<string, object?>(\"cache.method\", \"{cacheMethodTag}\"));");
-        sb.AppendLine("            return __cached!;");
+        // For a struct T the local is Nullable<T>; the null-forgiving operator suppresses a
+        // warning but performs no conversion, so the value has to be unwrapped explicitly.
+        // An already-nullable T needs no unwrap — the method returns the nullable type.
+        // `!` first: TryGetValue returning true guarantees a value, but flow analysis cannot see
+        // that, and CS8629 is an error under warnings-as-errors.
+        var cachedReturnExpr = m.InnerIsValueType && !m.InnerIsNullable ? "__cached!.Value" : "__cached!";
+        sb.AppendLine($"            return {cachedReturnExpr};");
         sb.AppendLine("        }");
         sb.AppendLine($"        _misses.Add(1, new global::System.Collections.Generic.KeyValuePair<string, object?>(\"method\", \"{m.Name}\"));");
         sb.AppendLine($"        var __result = await _inner.{m.Name}({m.ArgumentList}).ConfigureAwait(false);");
@@ -351,9 +360,13 @@ internal static class CacheWriter
         bool anyHybridCache = model.AnyMethodUsesHybridCache;
         bool anyIsolated = model.AnyMethodUsesIsolatedCache;
 
-        sb.AppendLine("public static partial class CacheServiceCollectionExtensions");
+        // CS0703: a public extension method cannot carry a generic constraint naming a less
+        // accessible interface. Match the interface's accessibility instead (#120). The proxy
+        // class is already internal, so only this pair needs adjusting.
+        var access = model.IsPubliclyAccessible ? "public" : "internal";
+        sb.AppendLine($"{access} static partial class CacheServiceCollectionExtensions");
         sb.AppendLine("{");
-        sb.AppendLine($"    public static global::Microsoft.Extensions.DependencyInjection.IServiceCollection {methodName}<");
+        sb.AppendLine($"    {access} static global::Microsoft.Extensions.DependencyInjection.IServiceCollection {methodName}<");
         // IL2091: TImpl flows into AddTransient<T> which requires PublicConstructors.
         // Without this annotation consumers' publish fails when they promote IL2091 to error.
         sb.AppendLine("        [global::System.Diagnostics.CodeAnalysis.DynamicallyAccessedMembers(");

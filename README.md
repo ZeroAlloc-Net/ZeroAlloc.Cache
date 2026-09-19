@@ -29,7 +29,7 @@ public interface IProductRepository
 }
 
 // Register — one line wires everything
-builder.Services.AddIProductRepositoryCache<ProductRepositoryImpl>();
+builder.Services.AddProductRepositoryCache<ProductRepositoryImpl>();
 ```
 
 Inject `IProductRepository` anywhere — caching is transparent to the caller.
@@ -69,7 +69,7 @@ Full methodology + design analysis: [docs/performance.md](https://github.com/Zer
 | `MaxEntries` | Isolates the method in its own `MemoryCache` instance with a `SizeLimit` |
 | Compile-time key | Cache key expression is emitted by the generator — zero key-building overhead on hit |
 | AOT / trimmer safe | Generated proxy is concrete; no reflection at runtime |
-| DI integration | Generated `Add{IService}Cache<TImpl>()` extension registers everything |
+| DI integration | Generated `Add{Service}Cache<TImpl>()` extension registers everything, e.g. `AddProductRepositoryCache` for `IProductRepository` |
 
 ---
 

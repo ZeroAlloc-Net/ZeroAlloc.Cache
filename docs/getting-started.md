@@ -31,11 +31,11 @@ public interface IProductRepository
 
 ## 3. Register with DI
 
-The source generator emits an `Add{IService}Cache<TImpl>()` extension method on `IServiceCollection`. Call it once during startup.
+The source generator emits an `Add{Service}Cache<TImpl>()` extension method on `IServiceCollection`, where `{Service}` is the interface name with any leading `I` removed — `IProductRepository` produces `AddProductRepositoryCache`. Call it once during startup.
 
 ```csharp
 // Program.cs / Startup.cs
-builder.Services.AddIProductRepositoryCache<ProductRepositoryImpl>();
+builder.Services.AddProductRepositoryCache<ProductRepositoryImpl>();
 ```
 
 This registers:
