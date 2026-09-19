@@ -5,6 +5,8 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
 
+using ZeroAlloc.TestHelpers;
+
 namespace ZeroAlloc.Cache.Generator.Tests;
 
 internal static class TestHelper
@@ -36,7 +38,7 @@ internal static class TestHelper
             .Select(p => (MetadataReference)MetadataReference.CreateFromFile(p))
             .ToList();
 
-    public static Task Verify(string source)
+    public static void Verify(string source)
     {
         var syntaxTree = CSharpSyntaxTree.ParseText(source, ParseOptions);
         var references = BuildReferences();
@@ -53,7 +55,7 @@ internal static class TestHelper
             .WithUpdatedParseOptions(ParseOptions)
             .RunGenerators(compilation);
 
-        return VerifyXunit.Verifier.Verify(driver).UseDirectory("Snapshots");
+        GeneratorSnapshot.Verify(driver);
     }
 
     public static IReadOnlyList<string> GetGeneratedFileNames(string source)
