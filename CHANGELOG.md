@@ -4,6 +4,13 @@ All notable changes to this project are documented here. The format is based on
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the project follows
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.1.45](https://github.com/ZeroAlloc-Net/ZeroAlloc.Cache/compare/v1.1.44...v1.1.45) (2026-09-20)
+
+
+### CI
+
+* run benchmarks in CI ([#154](https://github.com/ZeroAlloc-Net/ZeroAlloc.Cache/issues/154)) ([5eb243e](https://github.com/ZeroAlloc-Net/ZeroAlloc.Cache/commit/5eb243e1530e443e6983ba24a244277f6b431999))
+
 ## [1.1.44](https://github.com/ZeroAlloc-Net/ZeroAlloc.Cache/compare/v1.1.43...v1.1.44) (2026-09-19)
 
 
