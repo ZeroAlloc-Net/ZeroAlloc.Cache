@@ -4,6 +4,20 @@ All notable changes to this project are documented here. The format is based on
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the project follows
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.1.45](https://github.com/ZeroAlloc-Net/ZeroAlloc.Cache/compare/v1.1.44...v1.1.45) (2026-09-20)
+
+
+### Bug Fixes
+
+* **ci:** pin the SDK floor at the .NET 10 GA band, not the newest patch ([#159](https://github.com/ZeroAlloc-Net/ZeroAlloc.Cache/issues/159)) ([2326c01](https://github.com/ZeroAlloc-Net/ZeroAlloc.Cache/commit/2326c018507dc3f0c6738cdb1889a13c140911b0))
+
+
+### Chores
+
+* **deps:** update dependency dotnet-sdk to v10.0.401 ([#161](https://github.com/ZeroAlloc-Net/ZeroAlloc.Cache/issues/161)) ([cdcd748](https://github.com/ZeroAlloc-Net/ZeroAlloc.Cache/commit/cdcd7485da0cdab0953798ca190abf7d94a9e1b1))
+* **deps:** update dependency zeroalloc.testhelpers to 1.3.* ([#158](https://github.com/ZeroAlloc-Net/ZeroAlloc.Cache/issues/158)) ([d494bc9](https://github.com/ZeroAlloc-Net/ZeroAlloc.Cache/commit/d494bc9815abc761ed4a8cb9ae260e244597e6de))
+* stop cutting a release for CI-only commits ([#156](https://github.com/ZeroAlloc-Net/ZeroAlloc.Cache/issues/156)) ([1771e95](https://github.com/ZeroAlloc-Net/ZeroAlloc.Cache/commit/1771e95d439855aeba2375bcfeb9b25991e76e8a))
+
 ## [1.1.44](https://github.com/ZeroAlloc-Net/ZeroAlloc.Cache/compare/v1.1.43...v1.1.44) (2026-09-19)
 
 
