@@ -4,6 +4,13 @@ All notable changes to this project are documented here. The format is based on
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the project follows
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.1.47](https://github.com/ZeroAlloc-Net/ZeroAlloc.Cache/compare/v1.1.46...v1.1.47) (2026-09-25)
+
+
+### Chores
+
+* **deps:** update actions/upload-artifact action to v7 ([#168](https://github.com/ZeroAlloc-Net/ZeroAlloc.Cache/issues/168)) ([5dfddc6](https://github.com/ZeroAlloc-Net/ZeroAlloc.Cache/commit/5dfddc6dcdfeb31b9c406f9beda2183e59e82732))
+
 ## [1.1.46](https://github.com/ZeroAlloc-Net/ZeroAlloc.Cache/compare/v1.1.45...v1.1.46) (2026-09-23)
 
 
