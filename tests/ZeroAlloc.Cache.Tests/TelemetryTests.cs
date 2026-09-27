@@ -75,16 +75,9 @@ public sealed class TelemetryTests
         meterListener.SetMeasurementEventCallback<double>((instrument, value, tags, state) =>
         {
             var tagDict = new Dictionary<string, object?>(tags.Length, StringComparer.Ordinal);
-            // HLQ013 suggests foreach but EPS06 then complains about hidden struct copies
-            // when reading Key/Value from a non-readonly KeyValuePair via a ref readonly enumerator.
-            // Indexed access reads via locals, which avoids both warnings.
-#pragma warning disable HLQ013
-            for (var i = 0; i < tags.Length; i++)
-#pragma warning restore HLQ013
+            foreach (ref readonly var tag in tags)
             {
-                var key = tags[i].Key;
-                var val = tags[i].Value;
-                tagDict[key] = val;
+                tagDict[tag.Key] = tag.Value;
             }
             recorded.Add((value, tagDict));
         });

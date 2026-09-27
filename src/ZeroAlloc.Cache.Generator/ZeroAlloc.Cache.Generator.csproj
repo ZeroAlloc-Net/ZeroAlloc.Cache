@@ -9,13 +9,7 @@
     <Description>Roslyn source generator for ZeroAlloc.Cache.</Description>
     <Version>0.0.0-local</Version>
     <GeneratePackageOnBuild>false</GeneratePackageOnBuild>
-    <!--
-      EPS06 fires on IncrementalValuesProvider.Where/.Select chains — the canonical
-      Roslyn incremental-generator pipeline pattern. The "hidden struct copy" warning
-      is a false positive here: IncrementalValuesProvider<T> is documented public API
-      designed to flow through the pipeline by value.
-    -->
-    <NoWarn>$(NoWarn);RS2008;EPS06</NoWarn>
+    <NoWarn>$(NoWarn);RS2008</NoWarn>
 
     <!--
       Source-generator packaging: ship the generator DLL under analyzers/dotnet/cs so
