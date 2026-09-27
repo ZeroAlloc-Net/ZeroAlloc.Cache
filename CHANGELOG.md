@@ -4,6 +4,18 @@ All notable changes to this project are documented here. The format is based on
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the project follows
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.1.49](https://github.com/ZeroAlloc-Net/ZeroAlloc.Cache/compare/v1.1.48...v1.1.49) (2026-09-27)
+
+
+### Build System
+
+* fail pack when no release version is supplied ([#175](https://github.com/ZeroAlloc-Net/ZeroAlloc.Cache/issues/175)) ([98fb48d](https://github.com/ZeroAlloc-Net/ZeroAlloc.Cache/commit/98fb48d25f09b0513442ee0758dcca8ce76e304b))
+
+
+### Chores
+
+* remove ErrorProne.NET, enforce readonly structs with IDE0250/IDE0251 ([#173](https://github.com/ZeroAlloc-Net/ZeroAlloc.Cache/issues/173)) ([4f32572](https://github.com/ZeroAlloc-Net/ZeroAlloc.Cache/commit/4f32572a8226fc31701fd0be1e1d9c0cff7c5b59))
+
 ## [1.1.48](https://github.com/ZeroAlloc-Net/ZeroAlloc.Cache/compare/v1.1.47...v1.1.48) (2026-09-26)
 
 
