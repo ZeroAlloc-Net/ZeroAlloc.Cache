@@ -42,14 +42,14 @@ internal sealed class IMyServiceCacheProxy : global::T.IMyService
         __activity?.SetTag("cache.method", "IMyService.GetByIdAsync");
         var __sw = global::System.Diagnostics.Stopwatch.GetTimestamp();
         var __key = $"IMyService.GetByIdAsync:{id}";
-        if (_cache.TryGetValue(__key, out string? __cached))
+        if (_cache.TryGetValue(__key, out object? __boxed) && __boxed is null or string)
         {
             _hits.Add(1, new global::System.Collections.Generic.KeyValuePair<string, object?>("method", "GetByIdAsync"));
             __activity?.SetTag("cache.tier", "L1");
             __activity?.SetTag("cache.hit", true);
             _lookupDurationMs.Record(global::System.Diagnostics.Stopwatch.GetElapsedTime(__sw).TotalMilliseconds,
                 new global::System.Collections.Generic.KeyValuePair<string, object?>("cache.method", "IMyService.GetByIdAsync"));
-            return __cached!;
+            return (string)__boxed!;
         }
         _misses.Add(1, new global::System.Collections.Generic.KeyValuePair<string, object?>("method", "GetByIdAsync"));
         var __result = await _inner.GetByIdAsync(id, ct).ConfigureAwait(false);
@@ -70,14 +70,14 @@ internal sealed class IMyServiceCacheProxy : global::T.IMyService
         __activity?.SetTag("cache.method", "IMyService.GetBySlugAsync");
         var __sw = global::System.Diagnostics.Stopwatch.GetTimestamp();
         var __key = $"IMyService.GetBySlugAsync:{slug}";
-        if (_cache.TryGetValue(__key, out string? __cached))
+        if (_cache.TryGetValue(__key, out object? __boxed) && __boxed is null or string)
         {
             _hits.Add(1, new global::System.Collections.Generic.KeyValuePair<string, object?>("method", "GetBySlugAsync"));
             __activity?.SetTag("cache.tier", "L1");
             __activity?.SetTag("cache.hit", true);
             _lookupDurationMs.Record(global::System.Diagnostics.Stopwatch.GetElapsedTime(__sw).TotalMilliseconds,
                 new global::System.Collections.Generic.KeyValuePair<string, object?>("cache.method", "IMyService.GetBySlugAsync"));
-            return __cached!;
+            return (string)__boxed!;
         }
         _misses.Add(1, new global::System.Collections.Generic.KeyValuePair<string, object?>("method", "GetBySlugAsync"));
         var __result = await _inner.GetBySlugAsync(slug, ct).ConfigureAwait(false);

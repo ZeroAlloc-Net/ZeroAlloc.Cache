@@ -29,6 +29,7 @@ public class CachedLookupBenchmark
         _proxied = new ICustomerServiceCacheProxy(_direct, _cache);
         // Warm the cache for the single key we measure.
         _ = await _proxied.GetNameAsync(42, CancellationToken.None).ConfigureAwait(false);
+        _ = await _proxied.GetScoreAsync(42, CancellationToken.None).ConfigureAwait(false);
     }
 
     [GlobalCleanup]
@@ -41,16 +42,26 @@ public class CachedLookupBenchmark
     [Benchmark(Description = "proxied (cache hit)")]
     public async Task<string> Proxied()
         => await _proxied.GetNameAsync(42, CancellationToken.None).ConfigureAwait(false);
+
+    // A value-type return unboxes the cached entry on a hit, see #182.
+    [Benchmark(Description = "proxied value type (cache hit)")]
+    public async Task<int> ProxiedValueType()
+        => await _proxied.GetScoreAsync(42, CancellationToken.None).ConfigureAwait(false);
 }
 
 [Cache(TtlMs = 60_000)]
 public interface ICustomerService
 {
     ValueTask<string> GetNameAsync(int customerId, CancellationToken ct);
+
+    ValueTask<int> GetScoreAsync(int customerId, CancellationToken ct);
 }
 
 public sealed class CustomerService : ICustomerService
 {
     public ValueTask<string> GetNameAsync(int customerId, CancellationToken ct)
         => ValueTask.FromResult($"customer-{customerId}");
+
+    public ValueTask<int> GetScoreAsync(int customerId, CancellationToken ct)
+        => ValueTask.FromResult(customerId * 10);
 }

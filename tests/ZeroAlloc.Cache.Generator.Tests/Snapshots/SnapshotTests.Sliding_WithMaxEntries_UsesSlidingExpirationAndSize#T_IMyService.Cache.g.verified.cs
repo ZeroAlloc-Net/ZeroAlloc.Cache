@@ -42,14 +42,14 @@ internal sealed class IMyServiceCacheProxy : global::T.IMyService
         __activity?.SetTag("cache.method", "IMyService.GetAsync");
         var __sw = global::System.Diagnostics.Stopwatch.GetTimestamp();
         var __key = $"IMyService.GetAsync:{id}";
-        if (_boundedCache.TryGetValue(__key, out string? __cached))
+        if (_boundedCache.TryGetValue(__key, out object? __boxed) && __boxed is null or string)
         {
             _hits.Add(1, new global::System.Collections.Generic.KeyValuePair<string, object?>("method", "GetAsync"));
             __activity?.SetTag("cache.tier", "L1");
             __activity?.SetTag("cache.hit", true);
             _lookupDurationMs.Record(global::System.Diagnostics.Stopwatch.GetElapsedTime(__sw).TotalMilliseconds,
                 new global::System.Collections.Generic.KeyValuePair<string, object?>("cache.method", "IMyService.GetAsync"));
-            return __cached!;
+            return (string)__boxed!;
         }
         _misses.Add(1, new global::System.Collections.Generic.KeyValuePair<string, object?>("method", "GetAsync"));
         var __result = await _inner.GetAsync(id, ct).ConfigureAwait(false);

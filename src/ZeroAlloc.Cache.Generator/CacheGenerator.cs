@@ -6,6 +6,13 @@ namespace ZeroAlloc.Cache.Generator;
 [Generator]
 public sealed class CacheGenerator : IIncrementalGenerator
 {
+    // Every type name the proxy emits must keep a nullable reference annotation: without it a
+    // ValueTask<string?> member is implemented as ValueTask<string>, CS8613 and CS8603 in a
+    // consumer with nullable enabled. FullyQualifiedFormat alone drops the '?'.
+    private static readonly SymbolDisplayFormat TypeFormat =
+        SymbolDisplayFormat.FullyQualifiedFormat.AddMiscellaneousOptions(
+            SymbolDisplayMiscellaneousOptions.IncludeNullableReferenceTypeModifier);
+
     public void Initialize(IncrementalGeneratorInitializationContext context)
     {
         var models = context.SyntaxProvider
@@ -222,7 +229,7 @@ public sealed class CacheGenerator : IIncrementalGenerator
             if (!firstParam) { paramSb.Append(", "); argSb.Append(", "); }
             firstParam = false;
 
-            var fqn = param.Type.ToDisplayString(Microsoft.CodeAnalysis.SymbolDisplayFormat.FullyQualifiedFormat);
+            var fqn = param.Type.ToDisplayString(TypeFormat);
             paramSb.Append(fqn).Append(' ').Append(param.Name);
             argSb.Append(param.Name);
 
@@ -255,7 +262,7 @@ public sealed class CacheGenerator : IIncrementalGenerator
     {
         passthroughMethods.Add(new PassthroughMethodModel(
             method.Name,
-            method.ReturnType.ToDisplayString(Microsoft.CodeAnalysis.SymbolDisplayFormat.FullyQualifiedFormat),
+            method.ReturnType.ToDisplayString(TypeFormat),
             paramList,
             argList
         ));
@@ -321,23 +328,29 @@ public sealed class CacheGenerator : IIncrementalGenerator
             innerReturnSymbol = method.ReturnType;
         }
 
-        innerReturnFqn = innerReturnSymbol
-            .ToDisplayString(Microsoft.CodeAnalysis.SymbolDisplayFormat.FullyQualifiedFormat);
+        innerReturnFqn = innerReturnSymbol.ToDisplayString(TypeFormat);
 
-        // The cache-hit path declares `out T? __cached`. Two shapes need special handling:
-        // a struct T, because the null-forgiving operator cannot convert Nullable<T> back to T;
-        // and a T that is already nullable, because appending a second '?' does not parse.
+        // The cache-hit path tests the stored object against T without its nullability, because
+        // a type pattern cannot name a nullable type. For Nullable<U> that is U; for an annotated
+        // reference type it is the type without the annotation. See CacheWriter and #182.
         bool innerIsValueType = innerReturnSymbol.IsValueType;
+        bool innerIsNullableValueType =
+            innerReturnSymbol is INamedTypeSymbol { OriginalDefinition.SpecialType: SpecialType.System_Nullable_T };
         bool innerIsNullable =
-            innerReturnSymbol.NullableAnnotation == NullableAnnotation.Annotated
-            || (innerReturnSymbol is INamedTypeSymbol { OriginalDefinition.SpecialType: SpecialType.System_Nullable_T });
+            innerReturnSymbol.NullableAnnotation == NullableAnnotation.Annotated || innerIsNullableValueType;
+        var innerUnderlyingSymbol = innerIsNullableValueType
+            ? ((INamedTypeSymbol)innerReturnSymbol).TypeArguments[0]
+            : innerReturnSymbol.WithNullableAnnotation(NullableAnnotation.NotAnnotated);
+        var innerUnderlyingFqn = innerUnderlyingSymbol
+            .ToDisplayString(Microsoft.CodeAnalysis.SymbolDisplayFormat.FullyQualifiedFormat);
 
         cachedMethods.Add(new CachedMethodModel(
             method.Name,
-            method.ReturnType.ToDisplayString(Microsoft.CodeAnalysis.SymbolDisplayFormat.FullyQualifiedFormat),
+            method.ReturnType.ToDisplayString(TypeFormat),
             innerReturnFqn,
             innerIsValueType,
             innerIsNullable,
+            innerUnderlyingFqn,
             paramList,
             argList,
             keyArgs,

@@ -6,8 +6,9 @@ internal sealed record CachedMethodModel(
     string Name,
     string ReturnTypeFqn,       // e.g., "System.Threading.Tasks.ValueTask<string>"
     string InnerReturnTypeFqn,  // e.g., "string" — the T in ValueTask<T>
-    bool InnerIsValueType,      // T is a struct: the cache-hit path must unwrap Nullable<T>
-    bool InnerIsNullable,       // T is already nullable: do not append a second '?'
+    bool InnerIsValueType,      // T is a struct: the cache hit unboxes it
+    bool InnerIsNullable,       // T is Nullable<U> or an annotated reference: a cached null is a hit
+    string InnerUnderlyingTypeFqn, // T without nullability, e.g. "int" for int?: the cache-hit type test
     string ParameterList,       // e.g., "global::System.String id, global::System.Threading.CancellationToken ct"
     string ArgumentList,        // e.g., "id, ct" — all args
     string KeyArguments,        // e.g., ":{id}" or ":{id}:{page}" — appended in key interpolation
@@ -34,6 +35,7 @@ internal sealed record CachedMethodModel(
             && string.Equals(InnerReturnTypeFqn, other.InnerReturnTypeFqn, System.StringComparison.Ordinal)
             && InnerIsValueType == other.InnerIsValueType
             && InnerIsNullable == other.InnerIsNullable
+            && string.Equals(InnerUnderlyingTypeFqn, other.InnerUnderlyingTypeFqn, System.StringComparison.Ordinal)
             && string.Equals(ParameterList, other.ParameterList, System.StringComparison.Ordinal)
             && string.Equals(ArgumentList, other.ArgumentList, System.StringComparison.Ordinal)
             && string.Equals(KeyArguments, other.KeyArguments, System.StringComparison.Ordinal)

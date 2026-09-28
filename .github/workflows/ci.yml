@@ -57,6 +57,9 @@ jobs:
 
   aot-smoke:
     runs-on: ubuntu-latest
+    # About 3x a normal run, which takes under a minute. A hang must fail the job, not hold
+    # the runner until the 6-hour default. See #182.
+    timeout-minutes: 3
     # Publishes samples/ZeroAlloc.Cache.AotSmoke with PublishAot=true. The
     # generator emits an interface proxy — classic territory for reflection
     # hazards — so this job catches any IL2026/IL3050 regression in the
@@ -84,8 +87,10 @@ jobs:
       - name: Publish AOT
         run: dotnet publish samples/ZeroAlloc.Cache.AotSmoke/ZeroAlloc.Cache.AotSmoke.csproj -r linux-x64 -c Release -o ./aot-out
 
+      # The smoke fails any call that takes over 10 seconds with a message naming it. This outer
+      # limit is the backstop in case the process cannot exit; a normal run takes under a second.
       - name: Run AOT binary
-        run: ./aot-out/ZeroAlloc.Cache.AotSmoke
+        run: timeout -k 5 30 ./aot-out/ZeroAlloc.Cache.AotSmoke
 
   api-compat:
     uses: ZeroAlloc-Net/.github/.github/workflows/api-compat.yml@main

@@ -60,8 +60,64 @@ await using (provider.ConfigureAwait(false))
         return Fail($"Unbounded method: expected a cache hit, WarehouseCalls is {log.WarehouseCalls}");
 }
 
+// Value-type returns. A cache hit on any of them hung under NativeAOT, see #182, so every call
+// runs under a time limit and a hang fails the smoke with a message instead of stalling the job.
+using (var valueCache = new MemoryCache(new MemoryCacheOptions()))
+{
+    var values = new ValueService();
+    var valueProxy = new IValueServiceCacheProxy(values, valueCache);
+
+    for (var call = 1; call <= 2; call++)
+    {
+        var count = await WithinTimeLimit($"GetCountAsync call {call}", () => valueProxy.GetCountAsync(3, CancellationToken.None).AsTask()).ConfigureAwait(false);
+        if (count != 30 || values.CountCalls != 1)
+            return Fail($"ValueTask<int> call {call}: expected 30 from one inner call, got {count} after {values.CountCalls}");
+
+        var total = await WithinTimeLimit($"GetOptionalTotalAsync call {call}", () => valueProxy.GetOptionalTotalAsync(3, CancellationToken.None)).ConfigureAwait(false);
+        if (total != 300 || values.TotalCalls != 1)
+            return Fail($"Task<long?> call {call}: expected 300 from one inner call, got {total} after {values.TotalCalls}");
+
+        var coordinates = await WithinTimeLimit($"GetCoordinatesAsync call {call}", () => valueProxy.GetCoordinatesAsync(3, CancellationToken.None).AsTask()).ConfigureAwait(false);
+        if (coordinates != new Coordinates(3, -3) || values.CoordinatesCalls != 1)
+            return Fail($"ValueTask<Coordinates> call {call}: expected (3, -3) from one inner call, got {coordinates} after {values.CoordinatesCalls}");
+
+        var temperature = await WithinTimeLimit($"GetTemperatureAsync call {call}", () => valueProxy.GetTemperatureAsync(3, CancellationToken.None).AsTask()).ConfigureAwait(false);
+        if (temperature != new Temperature(3) || values.TemperatureCalls != 1)
+            return Fail($"ValueTask<Temperature?> call {call}: expected 3 degrees from one inner call, got {temperature} after {values.TemperatureCalls}");
+    }
+
+    // A cached null is a hit too: the second call must not re-enter the inner service.
+    for (var call = 1; call <= 2; call++)
+    {
+        var total = await WithinTimeLimit($"GetOptionalTotalAsync null call {call}", () => valueProxy.GetOptionalTotalAsync(0, CancellationToken.None)).ConfigureAwait(false);
+        if (total is not null || values.TotalCalls != 2)
+            return Fail($"Task<long?> null call {call}: expected null from a second inner call, got {total} after {values.TotalCalls}");
+
+        var temperature = await WithinTimeLimit($"GetTemperatureAsync null call {call}", () => valueProxy.GetTemperatureAsync(0, CancellationToken.None).AsTask()).ConfigureAwait(false);
+        if (temperature is not null || values.TemperatureCalls != 2)
+            return Fail($"ValueTask<Temperature?> null call {call}: expected null from a second inner call, got {temperature} after {values.TemperatureCalls}");
+    }
+}
+
 Console.WriteLine("AOT smoke: PASS");
 return 0;
+
+// Runs the call on the thread pool so a hung call cannot block the check that times it out.
+// Environment.Exit rather than a return: the hung thread never finishes.
+static async Task<T> WithinTimeLimit<T>(string what, Func<Task<T>> call)
+{
+    var limit = TimeSpan.FromSeconds(10);
+    try
+    {
+        return await Task.Run(call).WaitAsync(limit).ConfigureAwait(false);
+    }
+    catch (TimeoutException)
+    {
+        Fail($"{what} did not return within {limit.TotalSeconds} seconds, a value-type cache hit hang, see #182");
+        Environment.Exit(1);
+        throw;
+    }
+}
 
 static int Fail(string message)
 {

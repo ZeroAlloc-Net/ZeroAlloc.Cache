@@ -244,24 +244,16 @@ internal static class CacheWriter
         sb.AppendLine($"        __activity?.SetTag(\"cache.method\", \"{cacheMethodTag}\");");
         sb.AppendLine($"        var __sw = global::System.Diagnostics.Stopwatch.GetTimestamp();");
         sb.AppendLine($"        var __key = $\"{interfaceName}.{m.Name}{m.KeyArguments}\";");
-        // `T?` for a struct T is Nullable<T>; appending '?' to an already-nullable T would emit
-        // `int??`, which does not parse. See #122.
-        var cachedDeclType = m.InnerIsNullable ? m.InnerReturnTypeFqn : $"{m.InnerReturnTypeFqn}?";
         var cacheField = UsesBoundedCache(m) ? "_boundedCache" : "_cache";
-        sb.AppendLine($"        if ({cacheField}.TryGetValue(__key, out {cachedDeclType} __cached))");
+        var (hitCondition, hitReturn) = BuildCacheHit(m);
+        sb.AppendLine($"        if ({cacheField}.TryGetValue(__key, out object? __boxed) && {hitCondition})");
         sb.AppendLine("        {");
         sb.AppendLine($"            _hits.Add(1, new global::System.Collections.Generic.KeyValuePair<string, object?>(\"method\", \"{m.Name}\"));");
         sb.AppendLine($"            __activity?.SetTag(\"cache.tier\", \"L1\");");
         sb.AppendLine($"            __activity?.SetTag(\"cache.hit\", true);");
         sb.AppendLine($"            _lookupDurationMs.Record(global::System.Diagnostics.Stopwatch.GetElapsedTime(__sw).TotalMilliseconds,");
         sb.AppendLine($"                new global::System.Collections.Generic.KeyValuePair<string, object?>(\"cache.method\", \"{cacheMethodTag}\"));");
-        // For a struct T the local is Nullable<T>; the null-forgiving operator suppresses a
-        // warning but performs no conversion, so the value has to be unwrapped explicitly.
-        // An already-nullable T needs no unwrap — the method returns the nullable type.
-        // `!` first: TryGetValue returning true guarantees a value, but flow analysis cannot see
-        // that, and CS8629 is an error under warnings-as-errors.
-        var cachedReturnExpr = m.InnerIsValueType && !m.InnerIsNullable ? "__cached!.Value" : "__cached!";
-        sb.AppendLine($"            return {cachedReturnExpr};");
+        sb.AppendLine($"            return {hitReturn};");
         sb.AppendLine("        }");
         sb.AppendLine($"        _misses.Add(1, new global::System.Collections.Generic.KeyValuePair<string, object?>(\"method\", \"{m.Name}\"));");
         sb.AppendLine($"        var __result = await _inner.{m.Name}({m.ArgumentList}).ConfigureAwait(false);");
@@ -273,6 +265,29 @@ internal static class CacheWriter
         sb.AppendLine("        return __result;");
         sb.AppendLine("    }");
         sb.AppendLine();
+    }
+
+    // The hit path reads the entry as object and tests it against the concrete return type.
+    // It must not call the generic CacheExtensions.TryGetValue<TItem>: for a value-type return
+    // TItem is Nullable<T>, and its `result is TItem` test never returns under NativeAOT unless
+    // something else in the app happens to use Nullable<T>. That is an upstream runtime bug,
+    // so this shape is a mitigation, not a simplification target: keep it until the runtime
+    // fix ships. See https://github.com/ZeroAlloc-Net/ZeroAlloc.Cache/issues/182.
+    // Unboxing a value type does not allocate, so this adds no allocation to the hit path.
+    // A stored null is a hit for a nullable return, as it was with TryGetValue<TItem>.
+    private static (string Condition, string Return) BuildCacheHit(CachedMethodModel m)
+    {
+        var underlying = m.InnerUnderlyingTypeFqn;
+        if (m.InnerIsValueType && !m.InnerIsNullable)
+            return ($"__boxed is {underlying} __cached", "__cached");
+
+        // Nullable<T>: test and unbox as T, so no runtime cast or unbox ever targets Nullable<T>.
+        if (m.InnerIsValueType)
+            return ($"__boxed is null or {underlying}", $"__boxed is null ? default({underlying}?) : ({underlying})__boxed");
+
+        // A cached null is returned as it was stored; '!' only where the return type is not annotated.
+        var forgive = m.InnerIsNullable ? "" : "!";
+        return ($"__boxed is null or {underlying}", $"({m.InnerReturnTypeFqn})__boxed{forgive}");
     }
 
     private static void WriteCacheSetCall(StringBuilder sb, CachedMethodModel m, string cacheField)
