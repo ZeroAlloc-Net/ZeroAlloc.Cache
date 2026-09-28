@@ -104,7 +104,7 @@ public sealed class CacheGenerator : IIncrementalGenerator
             IsPubliclyAccessible(symbol),
             cachedMethods.Exists(static m => m.EffectiveConfig.UseHybridCache),
             cachedMethods.Exists(static m => !m.EffectiveConfig.UseHybridCache && m.EffectiveConfig.MaxEntries == 0),
-            cachedMethods.Exists(static m => !m.EffectiveConfig.UseHybridCache && m.EffectiveConfig.MaxEntries > 0),
+            cachedMethods.Exists(static m => m.UsesBoundedCache),
             isolatedCacheMaxEntries,
             System.Collections.Immutable.ImmutableArray.CreateRange(cachedMethods),
             System.Collections.Immutable.ImmutableArray.CreateRange(passthroughMethods),
@@ -113,13 +113,14 @@ public sealed class CacheGenerator : IIncrementalGenerator
     }
 
     /// <summary>
-    /// v1: all isolated methods share a single MemoryCache with SizeLimit = first MaxEntries &gt; 0 value.
+    /// All bounded methods share one MemoryCache whose SizeLimit is the first bounded method's
+    /// MaxEntries. Hybrid methods are skipped: they never use that cache.
     /// </summary>
     private static int FirstMaxEntries(System.Collections.Generic.List<CachedMethodModel> cachedMethods)
     {
         for (int i = 0; i < cachedMethods.Count; i++)
         {
-            if (cachedMethods[i].EffectiveConfig.MaxEntries > 0)
+            if (cachedMethods[i].UsesBoundedCache)
                 return cachedMethods[i].EffectiveConfig.MaxEntries;
         }
         return 0;
@@ -373,8 +374,8 @@ public sealed class CacheGenerator : IIncrementalGenerator
         bool hasDifferent = false;
         for (int i = 0; i < cachedMethods.Count; i++)
         {
-            int me = cachedMethods[i].EffectiveConfig.MaxEntries;
-            if (me > 0 && me != firstMaxEntries) { hasDifferent = true; break; }
+            if (!cachedMethods[i].UsesBoundedCache) continue;
+            if (cachedMethods[i].EffectiveConfig.MaxEntries != firstMaxEntries) { hasDifferent = true; break; }
         }
 
         if (!hasDifferent) return;

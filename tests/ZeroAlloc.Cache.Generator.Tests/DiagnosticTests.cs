@@ -185,7 +185,32 @@ public sealed class DiagnosticTests
         var zc0004 = diags.Where(d => string.Equals(d.Id, "ZC0004", StringComparison.Ordinal)).ToList();
         zc0004.Should().HaveCount(1);
         zc0004[0].Severity.Should().Be(DiagnosticSeverity.Warning);
-        zc0004[0].GetMessage().Should().Contain("IProductRepository").And.Contain("(500)");
+        zc0004[0].GetMessage().Should().Be(
+            "Interface 'IProductRepository': bounded methods specify different MaxEntries values. "
+            + "The bounded methods of an interface share one size-limited cache; "
+            + "the first bounded method's MaxEntries (500) sets its SizeLimit.");
+        diags.Should().NotContain(d => d.Severity == DiagnosticSeverity.Error);
+    }
+
+    // Only bounded methods share the size-limited cache; a hybrid method's MaxEntries is not a
+    // competing limit.
+    [Fact]
+    public async Task ZC0004_NotEmitted_ForHybridMethodMaxEntries()
+    {
+        const string source = ProductSource + """
+
+            public interface IProductRepository
+            {
+                [ZeroAlloc.Cache.Cache(TtlMs = 60_000, MaxEntries = 100, UseHybridCache = true)]
+                System.Threading.Tasks.ValueTask<Product?> FindAsync(string query, System.Threading.CancellationToken ct);
+
+                [ZeroAlloc.Cache.Cache(TtlMs = 60_000, MaxEntries = 500)]
+                System.Threading.Tasks.ValueTask<Product?> GetByIdAsync(int id, System.Threading.CancellationToken ct);
+            }
+            """;
+
+        var diags = await TestHelper.GetDiagnostics(source);
+        diags.Should().NotContain(d => string.Equals(d.Id, "ZC0004", StringComparison.Ordinal));
         diags.Should().NotContain(d => d.Severity == DiagnosticSeverity.Error);
     }
 
