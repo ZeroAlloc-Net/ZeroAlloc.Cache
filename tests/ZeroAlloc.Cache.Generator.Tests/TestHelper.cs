@@ -27,7 +27,7 @@ internal static class TestHelper
     /// package, where ZC0003 fires. The HybridCache type itself stays resolvable, as it does for that
     /// consumer, because it lives in Microsoft.Extensions.Caching.Abstractions.
     /// </summary>
-    private static List<MetadataReference> BuildReferences(bool referenceHybridCache = true) =>
+    internal static List<MetadataReference> BuildReferences(bool referenceHybridCache = true) =>
         ((string?)AppContext.GetData("TRUSTED_PLATFORM_ASSEMBLIES") ?? string.Empty)
             .Split(System.IO.Path.PathSeparator)
             .Where(p => p.EndsWith(".dll", StringComparison.OrdinalIgnoreCase))
