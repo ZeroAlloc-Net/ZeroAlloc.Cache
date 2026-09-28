@@ -13,6 +13,9 @@ public sealed class CacheGenerator : IIncrementalGenerator
         SymbolDisplayFormat.FullyQualifiedFormat.AddMiscellaneousOptions(
             SymbolDisplayMiscellaneousOptions.IncludeNullableReferenceTypeModifier);
 
+    /// <summary>The tracking name of the step that builds each interface's model.</summary>
+    internal const string ModelsTrackingName = "CacheModels";
+
     public void Initialize(IncrementalGeneratorInitializationContext context)
     {
         var models = context.SyntaxProvider
@@ -20,15 +23,16 @@ public sealed class CacheGenerator : IIncrementalGenerator
                 predicate: static (node, _) => IsCandidateInterface(node),
                 transform: static (ctx, ct) => TryParse(ctx, ct))
             .Where(static m => m is not null)
-            .Select(static (m, _) => m!);
+            .Select(static (m, _) => m!)
+            .WithTrackingName(ModelsTrackingName);
 
         context.RegisterSourceOutput(models, static (ctx, model) =>
         {
             var hasErrors = false;
             foreach (var d in model.Diagnostics)
             {
-                ctx.ReportDiagnostic(d);
-                if (d.Severity == Microsoft.CodeAnalysis.DiagnosticSeverity.Error)
+                ctx.ReportDiagnostic(d.ToDiagnostic());
+                if (d.Descriptor.DefaultSeverity == Microsoft.CodeAnalysis.DiagnosticSeverity.Error)
                     hasErrors = true;
             }
 
@@ -80,7 +84,7 @@ public sealed class CacheGenerator : IIncrementalGenerator
 
         var cachedMethods = new System.Collections.Generic.List<CachedMethodModel>();
         var passthroughMethods = new System.Collections.Generic.List<PassthroughMethodModel>();
-        var diagnostics = new System.Collections.Generic.List<Microsoft.CodeAnalysis.Diagnostic>();
+        var diagnostics = new System.Collections.Generic.List<DiagnosticInfo>();
 
         foreach (var member in symbol.GetMembers())
         {
@@ -152,7 +156,7 @@ public sealed class CacheGenerator : IIncrementalGenerator
         CacheConfig? ifaceConfig,
         System.Collections.Generic.List<CachedMethodModel> cachedMethods,
         System.Collections.Generic.List<PassthroughMethodModel> passthroughMethods,
-        System.Collections.Generic.List<Microsoft.CodeAnalysis.Diagnostic> diagnostics)
+        System.Collections.Generic.List<DiagnosticInfo> diagnostics)
     {
         if (member is not IMethodSymbol method)
             return;
@@ -180,9 +184,9 @@ public sealed class CacheGenerator : IIncrementalGenerator
             // ran on every call (#121).
             if (methodAttr != null && isUncacheableReturn)
             {
-                diagnostics.Add(Microsoft.CodeAnalysis.Diagnostic.Create(
+                diagnostics.Add(DiagnosticInfo.Create(
                     CacheDiagnostics.CacheAttributeIgnored,
-                    method.Locations.Length > 0 ? method.Locations[0] : Location.None,
+                    LocationInfo.From(methodAttr) ?? LocationInfo.From(method),
                     method.Name,
                     method.ReturnType.ToDisplayString()));
             }
@@ -191,7 +195,7 @@ public sealed class CacheGenerator : IIncrementalGenerator
             return;
         }
 
-        EmitDiagnostics(method, effectiveConfig!, keyParams, diagnostics);
+        EmitDiagnostics(method, methodAttr, effectiveConfig!, keyParams, diagnostics);
         AddCachedMethod(method, effectiveConfig!, paramList, argList, keyArgs,
             hasCt, ctParamName, keyParams, cachedMethods);
     }
@@ -270,22 +274,19 @@ public sealed class CacheGenerator : IIncrementalGenerator
 
     private static void EmitDiagnostics(
         IMethodSymbol method,
+        AttributeData? methodAttr,
         CacheConfig effectiveConfig,
         System.Collections.Generic.List<KeyParam> keyParams,
-        System.Collections.Generic.List<Microsoft.CodeAnalysis.Diagnostic> diagnostics)
+        System.Collections.Generic.List<DiagnosticInfo> diagnostics)
     {
-        Location? firstLoc = null;
-        foreach (var loc in method.Locations)
-        {
-            firstLoc = loc;
-            break;
-        }
-
+        // ZC0001 is about the settings, so it points at the method's own [Cache] when that set
+        // them. Settings from the interface's [Cache] apply to every method, and the warning names
+        // one method, so it points at that method.
         if (effectiveConfig.Sliding && effectiveConfig.UseHybridCache)
         {
-            diagnostics.Add(Microsoft.CodeAnalysis.Diagnostic.Create(
+            diagnostics.Add(DiagnosticInfo.Create(
                 CacheDiagnostics.SlidingNotSupportedOnHybridCache,
-                firstLoc,
+                (methodAttr is null ? null : LocationInfo.From(methodAttr)) ?? LocationInfo.From(method),
                 method.Name));
         }
 
@@ -295,13 +296,24 @@ public sealed class CacheGenerator : IIncrementalGenerator
         {
             if (kp.IsReferenceType)
             {
-                diagnostics.Add(Microsoft.CodeAnalysis.Diagnostic.Create(
+                diagnostics.Add(DiagnosticInfo.Create(
                     CacheDiagnostics.ReferenceTypeKeyParameter,
-                    firstLoc,
+                    ParameterLocation(method, kp.Name),
                     kp.Name,
                     method.Name));
             }
         }
+    }
+
+    /// <summary>The parameter's identifier, which ZC0002 is about; the method if it is not found.</summary>
+    private static LocationInfo? ParameterLocation(IMethodSymbol method, string name)
+    {
+        foreach (var parameter in method.Parameters)
+        {
+            if (string.Equals(parameter.Name, name, System.StringComparison.Ordinal))
+                return LocationInfo.From(parameter) ?? LocationInfo.From(method);
+        }
+        return LocationInfo.From(method);
     }
 
     private static void AddCachedMethod(
@@ -380,7 +392,7 @@ public sealed class CacheGenerator : IIncrementalGenerator
         INamedTypeSymbol symbol,
         System.Collections.Generic.List<CachedMethodModel> cachedMethods,
         int firstMaxEntries,
-        System.Collections.Generic.List<Microsoft.CodeAnalysis.Diagnostic> diagnostics)
+        System.Collections.Generic.List<DiagnosticInfo> diagnostics)
     {
         if (firstMaxEntries <= 0) return;
 
@@ -393,11 +405,9 @@ public sealed class CacheGenerator : IIncrementalGenerator
 
         if (!hasDifferent) return;
 
-        Location? firstLoc = null;
-        foreach (var loc in symbol.Locations) { firstLoc = loc; break; }
-        diagnostics.Add(Microsoft.CodeAnalysis.Diagnostic.Create(
+        diagnostics.Add(DiagnosticInfo.Create(
             CacheDiagnostics.MixedMaxEntriesValues,
-            firstLoc,
+            LocationInfo.From(symbol),
             symbol.Name,
             firstMaxEntries));
     }
@@ -406,7 +416,7 @@ public sealed class CacheGenerator : IIncrementalGenerator
         GeneratorSyntaxContext ctx,
         INamedTypeSymbol symbol,
         System.Collections.Generic.List<CachedMethodModel> cachedMethods,
-        System.Collections.Generic.List<Microsoft.CodeAnalysis.Diagnostic> diagnostics)
+        System.Collections.Generic.List<DiagnosticInfo> diagnostics)
     {
         if (!cachedMethods.Exists(static m => m.EffectiveConfig.UseHybridCache))
             return;
@@ -421,11 +431,9 @@ public sealed class CacheGenerator : IIncrementalGenerator
             return;
 
         // Microsoft.Extensions.Caching.Hybrid not referenced — emit an error
-        Location? firstLoc = null;
-        foreach (var loc in symbol.Locations) { firstLoc = loc; break; }
-        diagnostics.Add(Microsoft.CodeAnalysis.Diagnostic.Create(
+        diagnostics.Add(DiagnosticInfo.Create(
             CacheDiagnostics.HybridCacheNotAvailable,
-            firstLoc));
+            LocationInfo.From(symbol)));
     }
 
     private static AttributeData? FindCacheAttr(ISymbol symbol)

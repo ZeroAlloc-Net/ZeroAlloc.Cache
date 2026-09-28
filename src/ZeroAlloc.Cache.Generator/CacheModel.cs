@@ -1,6 +1,4 @@
 using System.Collections.Immutable;
-using Microsoft.CodeAnalysis;
-
 namespace ZeroAlloc.Cache.Generator;
 
 internal sealed record CacheModel(
@@ -14,7 +12,7 @@ internal sealed record CacheModel(
     int IsolatedCacheMaxEntries,          // SizeLimit for the isolated MemoryCache (first MaxEntries > 0)
     ImmutableArray<CachedMethodModel> CachedMethods,
     ImmutableArray<PassthroughMethodModel> PassthroughMethods,
-    ImmutableArray<Diagnostic> Diagnostics
+    ImmutableArray<DiagnosticInfo> Diagnostics
 )
 {
     // Override synthesized record equality for ImmutableArray fields
@@ -32,7 +30,7 @@ internal sealed record CacheModel(
             && IsolatedCacheMaxEntries == other.IsolatedCacheMaxEntries
             && ArraysEqual(CachedMethods, other.CachedMethods)
             && ArraysEqual(PassthroughMethods, other.PassthroughMethods)
-            && Diagnostics.Length == other.Diagnostics.Length; // Diagnostic doesn't implement IEquatable; compare by count only
+            && ArraysEqual(Diagnostics, other.Diagnostics);
     }
 
     public override int GetHashCode()
