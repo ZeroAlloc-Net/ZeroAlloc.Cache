@@ -212,4 +212,30 @@ public sealed class SnapshotTests
             """;
         TestHelper.Verify(source);
     }
+
+    // #182: the hit path tests the stored object against the concrete type for every return
+    // kind, never through the generic CacheExtensions.TryGetValue<TItem>.
+    [Fact]
+    public void ValueAndNullableReturns_HitPathTestsConcreteType()
+    {
+        const string source = """
+            using ZeroAlloc.Cache;
+            using System.Threading;
+            using System.Threading.Tasks;
+            namespace T;
+            public readonly record struct Money(decimal Amount);
+            [Cache(TtlMs = 30_000)]
+            public interface IMyService
+            {
+                ValueTask<int> CountAsync(int id, CancellationToken ct);
+                Task<int?> MaybeCountAsync(int id, CancellationToken ct);
+                ValueTask<Money> TotalAsync(int id, CancellationToken ct);
+                ValueTask<Money?> MaybeTotalAsync(int id, CancellationToken ct);
+                ValueTask<string?> MaybeNameAsync(int id, CancellationToken ct);
+                [Cache(TtlMs = 30_000, MaxEntries = 100)]
+                ValueTask<int> BoundedCountAsync(int id, CancellationToken ct);
+            }
+            """;
+        TestHelper.Verify(source);
+    }
 }

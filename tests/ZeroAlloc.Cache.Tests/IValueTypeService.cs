@@ -18,4 +18,13 @@ public interface IValueTypeService
     ValueTask<int?> MaybeCountAsync(string id, CancellationToken ct);
 
     ValueTask<Money> TotalAsync(string id, CancellationToken ct);
+
+    ValueTask<Money?> MaybeTotalAsync(string id, CancellationToken ct);
+
+    // Null on the first call only, so a null on the second call proves a cached null is a hit.
+    ValueTask<int?> FirstNullCountAsync(string id, CancellationToken ct);
+
+    ValueTask<Money?> FirstNullTotalAsync(string id, CancellationToken ct);
+
+    ValueTask<string?> FirstNullNameAsync(string id, CancellationToken ct);
 }

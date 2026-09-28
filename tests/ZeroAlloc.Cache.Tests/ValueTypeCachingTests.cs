@@ -55,6 +55,56 @@ public sealed class ValueTypeCachingTests
     }
 
     [Fact]
+    public async Task NullableStructReturn_SecondCall_IsServedFromCache()
+    {
+        var proxy = BuildProxy();
+
+        var first = await proxy.MaybeTotalAsync("a", CancellationToken.None);
+        var second = await proxy.MaybeTotalAsync("a", CancellationToken.None);
+
+        first.Should().Be(new Money(1m));
+        second.Should().Be(new Money(1m));
+    }
+
+    // The hit path tests the stored object against the concrete type, see #182. A stored null
+    // must stay a hit for every nullable return, as it was with CacheExtensions.TryGetValue.
+    [Fact]
+    public async Task NullableValueTypeReturn_CachedNull_IsAHit()
+    {
+        var proxy = BuildProxy();
+
+        var first = await proxy.FirstNullCountAsync("a", CancellationToken.None);
+        var second = await proxy.FirstNullCountAsync("a", CancellationToken.None);
+
+        first.Should().BeNull();
+        second.Should().BeNull("a cached null must be served from the cache, not re-invoke the inner method");
+    }
+
+    [Fact]
+    public async Task NullableStructReturn_CachedNull_IsAHit()
+    {
+        var proxy = BuildProxy();
+
+        var first = await proxy.FirstNullTotalAsync("a", CancellationToken.None);
+        var second = await proxy.FirstNullTotalAsync("a", CancellationToken.None);
+
+        first.Should().BeNull();
+        second.Should().BeNull("a cached null must be served from the cache, not re-invoke the inner method");
+    }
+
+    [Fact]
+    public async Task NullableReferenceReturn_CachedNull_IsAHit()
+    {
+        var proxy = BuildProxy();
+
+        var first = await proxy.FirstNullNameAsync("a", CancellationToken.None);
+        var second = await proxy.FirstNullNameAsync("a", CancellationToken.None);
+
+        first.Should().BeNull();
+        second.Should().BeNull("a cached null must be served from the cache, not re-invoke the inner method");
+    }
+
+    [Fact]
     public async Task DifferentKeys_DoNotShareACacheEntry()
     {
         var proxy = BuildProxy();
