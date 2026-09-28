@@ -19,7 +19,15 @@ internal static class TestHelper
     /// generated code depends on are appended explicitly — without them the generated trees fail to
     /// bind and CS-level defects (see #87) stay invisible to the harness.
     /// </summary>
-    private static List<MetadataReference> BuildReferences() =>
+    private const string HybridCacheAssemblyFileName = "Microsoft.Extensions.Caching.Hybrid.dll";
+
+    /// <summary>
+    /// <paramref name="referenceHybridCache"/> set to <see langword="false"/> leaves the HybridCache
+    /// assembly out, reproducing a consumer on net8.0 without the Microsoft.Extensions.Caching.Hybrid
+    /// package, where ZC0003 fires. The HybridCache type itself stays resolvable, as it does for that
+    /// consumer, because it lives in Microsoft.Extensions.Caching.Abstractions.
+    /// </summary>
+    private static List<MetadataReference> BuildReferences(bool referenceHybridCache = true) =>
         ((string?)AppContext.GetData("TRUSTED_PLATFORM_ASSEMBLIES") ?? string.Empty)
             .Split(System.IO.Path.PathSeparator)
             .Where(p => p.EndsWith(".dll", StringComparison.OrdinalIgnoreCase))
@@ -35,6 +43,8 @@ internal static class TestHelper
                 typeof(Microsoft.Extensions.DependencyInjection.ServiceCollectionServiceExtensions).Assembly.Location,
             })
             .Distinct(StringComparer.OrdinalIgnoreCase)
+            .Where(p => referenceHybridCache || !string.Equals(
+                System.IO.Path.GetFileName(p), HybridCacheAssemblyFileName, StringComparison.OrdinalIgnoreCase))
             .Select(p => (MetadataReference)MetadataReference.CreateFromFile(p))
             .ToList();
 
@@ -58,10 +68,10 @@ internal static class TestHelper
         GeneratorSnapshot.Verify(driver);
     }
 
-    public static IReadOnlyList<string> GetGeneratedFileNames(string source)
+    public static IReadOnlyList<string> GetGeneratedFileNames(string source, bool referenceHybridCache = true)
     {
         var syntaxTree = CSharpSyntaxTree.ParseText(source, ParseOptions);
-        var references = BuildReferences();
+        var references = BuildReferences(referenceHybridCache);
 
         var compilation = CSharpCompilation.Create(
             "Tests",
@@ -78,10 +88,10 @@ internal static class TestHelper
             .ToList();
     }
 
-    public static Task<IReadOnlyList<Diagnostic>> GetDiagnostics(string source)
+    public static Task<IReadOnlyList<Diagnostic>> GetDiagnostics(string source, bool referenceHybridCache = true)
     {
         var syntaxTree = CSharpSyntaxTree.ParseText(source, ParseOptions);
-        var references = BuildReferences();
+        var references = BuildReferences(referenceHybridCache);
 
         var compilation = CSharpCompilation.Create(
             "Tests",
