@@ -2,6 +2,7 @@ using System;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Caching.Memory;
+using Microsoft.Extensions.DependencyInjection;
 using ZeroAlloc.Cache.AotSmoke;
 
 // Exercise the generator-emitted ICustomerServiceCacheProxy under PublishAot=true.
@@ -31,6 +32,33 @@ if (!string.Equals(other, "customer-99", StringComparison.Ordinal))
     return Fail($"Different-key call expected 'customer-99', got '{other}'");
 if (impl.CallCount != 2)
     return Fail($"After different key, CallCount expected 2, got {impl.CallCount}");
+
+// A mixed bounded and unbounded interface through the generated DI extension. Two separately
+// resolved proxies must share the bounded cache, which lives as long as the container.
+var services = new ServiceCollection();
+services.AddSingleton<InventoryCallLog>();
+services.AddInventoryServiceCache<InventoryService>();
+var provider = services.BuildServiceProvider();
+await using (provider.ConfigureAwait(false))
+{
+    var log = provider.GetRequiredService<InventoryCallLog>();
+    var inventoryA = provider.GetRequiredService<IInventoryService>();
+    var inventoryB = provider.GetRequiredService<IInventoryService>();
+
+    var s1 = await inventoryA.GetStockAsync(7, CancellationToken.None).ConfigureAwait(false);
+    var s2 = await inventoryB.GetStockAsync(7, CancellationToken.None).ConfigureAwait(false);
+    if (!string.Equals(s1, "stock-7", StringComparison.Ordinal) || !string.Equals(s2, s1, StringComparison.Ordinal))
+        return Fail($"Bounded method returned '{s1}' and '{s2}'");
+    if (log.StockCalls != 1)
+        return Fail($"Bounded method: second proxy expected a cache hit, StockCalls is {log.StockCalls}");
+
+    var w1 = await inventoryA.GetWarehouseAsync(7, CancellationToken.None).ConfigureAwait(false);
+    var w2 = await inventoryB.GetWarehouseAsync(7, CancellationToken.None).ConfigureAwait(false);
+    if (!string.Equals(w1, "warehouse-7", StringComparison.Ordinal) || !string.Equals(w2, w1, StringComparison.Ordinal))
+        return Fail($"Unbounded method returned '{w1}' and '{w2}'");
+    if (log.WarehouseCalls != 1)
+        return Fail($"Unbounded method: expected a cache hit, WarehouseCalls is {log.WarehouseCalls}");
+}
 
 Console.WriteLine("AOT smoke: PASS");
 return 0;

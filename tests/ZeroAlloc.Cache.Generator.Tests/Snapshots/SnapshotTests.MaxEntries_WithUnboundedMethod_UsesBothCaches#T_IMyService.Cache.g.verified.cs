@@ -26,13 +26,16 @@ internal sealed class IMyServiceCacheProxy : global::T.IMyService
         _meter.CreateCounter<long>("cache.evictions");
 
     private readonly global::T.IMyService _inner;
+    private readonly global::Microsoft.Extensions.Caching.Memory.IMemoryCache _cache;
     private readonly global::Microsoft.Extensions.Caching.Memory.MemoryCache _boundedCache;
 
     public IMyServiceCacheProxy(
         global::T.IMyService inner,
+        global::Microsoft.Extensions.Caching.Memory.IMemoryCache cache,
         IMyServiceBoundedCache boundedCache)
     {
         _inner = inner;
+        _cache = cache;
         _boundedCache = boundedCache.Cache;
     }
 
@@ -54,7 +57,7 @@ internal sealed class IMyServiceCacheProxy : global::T.IMyService
         _misses.Add(1, new global::System.Collections.Generic.KeyValuePair<string, object?>("method", "GetAsync"));
         var __result = await _inner.GetAsync(id, ct).ConfigureAwait(false);
         _boundedCache.Set(__key, __result, new global::Microsoft.Extensions.Caching.Memory.MemoryCacheEntryOptions
-            { SlidingExpiration = global::System.TimeSpan.FromMilliseconds(30000), Size = 1 }
+            { AbsoluteExpirationRelativeToNow = global::System.TimeSpan.FromMilliseconds(30000), Size = 1 }
             .RegisterPostEvictionCallback(static (_, _, _, _) =>
                 _evictions.Add(1, new global::System.Collections.Generic.KeyValuePair<string, object?>("method", "GetAsync"))));
         __activity?.SetTag("cache.tier", "L1");
@@ -64,12 +67,40 @@ internal sealed class IMyServiceCacheProxy : global::T.IMyService
         return __result;
     }
 
+    public async global::System.Threading.Tasks.ValueTask<string> FindAsync(string query, global::System.Threading.CancellationToken ct)
+    {
+        using var __activity = _activitySource.StartActivity("cache.lookup");
+        __activity?.SetTag("cache.method", "IMyService.FindAsync");
+        var __sw = global::System.Diagnostics.Stopwatch.GetTimestamp();
+        var __key = $"IMyService.FindAsync:{query}";
+        if (_cache.TryGetValue(__key, out string? __cached))
+        {
+            _hits.Add(1, new global::System.Collections.Generic.KeyValuePair<string, object?>("method", "FindAsync"));
+            __activity?.SetTag("cache.tier", "L1");
+            __activity?.SetTag("cache.hit", true);
+            _lookupDurationMs.Record(global::System.Diagnostics.Stopwatch.GetElapsedTime(__sw).TotalMilliseconds,
+                new global::System.Collections.Generic.KeyValuePair<string, object?>("cache.method", "IMyService.FindAsync"));
+            return __cached!;
+        }
+        _misses.Add(1, new global::System.Collections.Generic.KeyValuePair<string, object?>("method", "FindAsync"));
+        var __result = await _inner.FindAsync(query, ct).ConfigureAwait(false);
+        _cache.Set(__key, __result, new global::Microsoft.Extensions.Caching.Memory.MemoryCacheEntryOptions
+            { AbsoluteExpirationRelativeToNow = global::System.TimeSpan.FromMilliseconds(10000) }
+            .RegisterPostEvictionCallback(static (_, _, _, _) =>
+                _evictions.Add(1, new global::System.Collections.Generic.KeyValuePair<string, object?>("method", "FindAsync"))));
+        __activity?.SetTag("cache.tier", "L1");
+        __activity?.SetTag("cache.hit", false);
+        _lookupDurationMs.Record(global::System.Diagnostics.Stopwatch.GetElapsedTime(__sw).TotalMilliseconds,
+            new global::System.Collections.Generic.KeyValuePair<string, object?>("cache.method", "IMyService.FindAsync"));
+        return __result;
+    }
+
 }
 
 internal sealed class IMyServiceBoundedCache : global::System.IDisposable
 {
     public global::Microsoft.Extensions.Caching.Memory.MemoryCache Cache { get; } =
-        new(new global::Microsoft.Extensions.Caching.Memory.MemoryCacheOptions { SizeLimit = 100 });
+        new(new global::Microsoft.Extensions.Caching.Memory.MemoryCacheOptions { SizeLimit = 500 });
 
     public void Dispose() => Cache.Dispose();
 }
@@ -83,12 +114,14 @@ public static partial class CacheServiceCollectionExtensions
         this global::Microsoft.Extensions.DependencyInjection.IServiceCollection services)
         where TImpl : class, global::T.IMyService
     {
+        services.AddMemoryCache();
         global::Microsoft.Extensions.DependencyInjection.Extensions.ServiceCollectionDescriptorExtensions
             .TryAddSingleton<IMyServiceBoundedCache>(services, static _ => new IMyServiceBoundedCache());
         services.AddTransient<TImpl>();
         services.AddTransient<global::T.IMyService>(sp =>
             new IMyServiceCacheProxy(
                 sp.GetRequiredService<TImpl>(),
+                sp.GetRequiredService<global::Microsoft.Extensions.Caching.Memory.IMemoryCache>(),
                 sp.GetRequiredService<IMyServiceBoundedCache>()));
         return services;
     }

@@ -144,6 +144,25 @@ public sealed class SnapshotTests
     }
 
     [Fact]
+    public void MaxEntries_WithUnboundedMethod_UsesBothCaches()
+    {
+        const string source = """
+            using ZeroAlloc.Cache;
+            using System.Threading;
+            using System.Threading.Tasks;
+            namespace T;
+            public interface IMyService
+            {
+                [Cache(TtlMs = 30_000, MaxEntries = 500)]
+                ValueTask<string> GetAsync(string id, CancellationToken ct);
+                [Cache(TtlMs = 10_000)]
+                ValueTask<string> FindAsync(string query, CancellationToken ct);
+            }
+            """;
+        TestHelper.Verify(source);
+    }
+
+    [Fact]
     public void Sliding_WithMaxEntries_UsesSlidingExpirationAndSize()
     {
         const string source = """
