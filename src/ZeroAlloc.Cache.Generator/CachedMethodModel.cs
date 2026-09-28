@@ -17,6 +17,13 @@ internal sealed record CachedMethodModel(
     CacheConfig EffectiveConfig          // method-level ?? interface-level
 )
 {
+    /// <summary>
+    /// A bounded method uses the interface's isolated size-limited cache: MaxEntries &gt; 0 and not
+    /// HybridCache, which ignores MaxEntries. Every other non-hybrid method uses the shared
+    /// IMemoryCache. See #180.
+    /// </summary>
+    public bool UsesBoundedCache => !EffectiveConfig.UseHybridCache && EffectiveConfig.MaxEntries > 0;
+
     // Override synthesized record equality for ImmutableArray<KeyParam>
     public bool Equals(CachedMethodModel? other)
     {

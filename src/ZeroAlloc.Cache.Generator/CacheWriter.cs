@@ -86,8 +86,7 @@ internal static class CacheWriter
 
     // Methods with MaxEntries > 0 use the isolated size-limited cache; every other non-hybrid
     // method uses the shared DI IMemoryCache, whatever else the interface declares. See #180.
-    private static bool UsesBoundedCache(CachedMethodModel m) =>
-        !m.EffectiveConfig.UseHybridCache && m.EffectiveConfig.MaxEntries > 0;
+    private static bool UsesBoundedCache(CachedMethodModel m) => m.UsesBoundedCache;
 
     private static string StripInterfacePrefix(string name)
     {
