@@ -66,7 +66,7 @@ Full methodology + design analysis: [docs/performance.md](https://github.com/Zer
 | `IMemoryCache` (default) | In-process L1 cache; no extra dependencies |
 | `HybridCache` (opt-in) | L1 + L2 distributed cache via `Microsoft.Extensions.Caching.Hybrid` |
 | Method-level override | Any `[Cache]` on a method shadows the interface-level config for that method |
-| `MaxEntries` | Moves the method to an isolated `MemoryCache` with a `SizeLimit`, shared by all bounded methods of the interface |
+| `MaxEntries` | Moves the method to an isolated `MemoryCache` with a `SizeLimit`, shared by all bounded methods of the interface for the lifetime of the container |
 | Compile-time key | Cache key expression is emitted by the generator — zero key-building overhead on hit |
 | AOT / trimmer safe | Generated proxy is concrete; no reflection at runtime |
 | DI integration | Generated `Add{Service}Cache<TImpl>()` extension registers everything, e.g. `AddProductRepositoryCache` for `IProductRepository` |

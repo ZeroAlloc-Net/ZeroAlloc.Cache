@@ -88,6 +88,25 @@ internal static class TestHelper
             .ToList();
     }
 
+    public static IReadOnlyList<string> GetGeneratedSources(string source)
+    {
+        var syntaxTree = CSharpSyntaxTree.ParseText(source, ParseOptions);
+
+        var compilation = CSharpCompilation.Create(
+            "Tests",
+            new[] { syntaxTree },
+            BuildReferences(),
+            new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
+
+        var driver = CSharpGeneratorDriver.Create(new CacheGenerator())
+            .WithUpdatedParseOptions(ParseOptions)
+            .RunGenerators(compilation);
+
+        return driver.GetRunResult().GeneratedTrees
+            .Select(t => t.GetText().ToString())
+            .ToList();
+    }
+
     public static Task<IReadOnlyList<Diagnostic>> GetDiagnostics(string source, bool referenceHybridCache = true)
     {
         var syntaxTree = CSharpSyntaxTree.ParseText(source, ParseOptions);

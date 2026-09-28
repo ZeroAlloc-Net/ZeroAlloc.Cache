@@ -104,7 +104,7 @@ public sealed class CacheGenerator : IIncrementalGenerator
             IsPubliclyAccessible(symbol),
             cachedMethods.Exists(static m => m.EffectiveConfig.UseHybridCache),
             cachedMethods.Exists(static m => !m.EffectiveConfig.UseHybridCache && m.EffectiveConfig.MaxEntries == 0),
-            cachedMethods.Exists(static m => m.EffectiveConfig.MaxEntries > 0),
+            cachedMethods.Exists(static m => !m.EffectiveConfig.UseHybridCache && m.EffectiveConfig.MaxEntries > 0),
             isolatedCacheMaxEntries,
             System.Collections.Immutable.ImmutableArray.CreateRange(cachedMethods),
             System.Collections.Immutable.ImmutableArray.CreateRange(passthroughMethods),

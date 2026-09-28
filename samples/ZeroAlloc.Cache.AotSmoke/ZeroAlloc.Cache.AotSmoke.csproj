@@ -12,6 +12,7 @@
 
   <ItemGroup>
     <PackageReference Include="Microsoft.Extensions.Caching.Memory" Version="10.0.12" />
+    <PackageReference Include="Microsoft.Extensions.DependencyInjection" Version="10.0.12" />
 
     <ProjectReference Include="..\..\src\ZeroAlloc.Cache\ZeroAlloc.Cache.csproj"
                       SetTargetFramework="TargetFramework=net10.0" />
