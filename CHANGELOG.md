@@ -4,6 +4,32 @@ All notable changes to this project are documented here. The format is based on
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the project follows
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.1.50](https://github.com/ZeroAlloc-Net/ZeroAlloc.Cache/compare/v1.1.49...v1.1.50) (2026-09-28)
+
+
+### Bug Fixes
+
+* allow MaxEntries methods and non-hybrid MaxEntries = 0 methods on the same interface ([3d5b60b](https://github.com/ZeroAlloc-Net/ZeroAlloc.Cache/commit/3d5b60bc27b2def2b17b7d41b504b020b6c45d30))
+* keep nullable reference annotations in generated proxy signatures ([e55d214](https://github.com/ZeroAlloc-Net/ZeroAlloc.Cache/commit/e55d2143b6344585065e1e8679b8a4aea6130aec))
+* mark released analyzer rules and public api as shipped and automate the move ([#178](https://github.com/ZeroAlloc-Net/ZeroAlloc.Cache/issues/178)) ([5cb2c7c](https://github.com/ZeroAlloc-Net/ZeroAlloc.Cache/commit/5cb2c7cc087d3bc64e0f9a9cbd286ec71fc5ba3e))
+* point ZC diagnostics at the code they are about and compare them by value ([#187](https://github.com/ZeroAlloc-Net/ZeroAlloc.Cache/issues/187)) ([3873671](https://github.com/ZeroAlloc-Net/ZeroAlloc.Cache/commit/38736711b7bfdd69dcdc20679e26161306248e26))
+* report ZC0003 when Microsoft.Extensions.Caching.Hybrid is not referenced instead of CS1061 ([195d0c2](https://github.com/ZeroAlloc-Net/ZeroAlloc.Cache/commit/195d0c2a49e0c43957f13fcaaeb07d94bdd95f5f))
+* say in the ZC0004 message that only bounded methods share the size-limited cache ([a641c75](https://github.com/ZeroAlloc-Net/ZeroAlloc.Cache/commit/a641c7506eab8a1033da7963ec987e739ea4da32))
+* share the MaxEntries bounded cache per container instead of resetting it on every injection ([3d5b60b](https://github.com/ZeroAlloc-Net/ZeroAlloc.Cache/commit/3d5b60bc27b2def2b17b7d41b504b020b6c45d30))
+* size the MaxEntries cache from non-hybrid bounded methods only ([a641c75](https://github.com/ZeroAlloc-Net/ZeroAlloc.Cache/commit/a641c7506eab8a1033da7963ec987e739ea4da32))
+* stop value-type cache hits hanging under NativeAOT ([e55d214](https://github.com/ZeroAlloc-Net/ZeroAlloc.Cache/commit/e55d2143b6344585065e1e8679b8a4aea6130aec))
+* treat only Task&lt;T&gt; and ValueTask&lt;T&gt; as cacheable so [Cache] on other generic returns reports ZC0005 ([195d0c2](https://github.com/ZeroAlloc-Net/ZeroAlloc.Cache/commit/195d0c2a49e0c43957f13fcaaeb07d94bdd95f5f))
+
+
+### Documentation
+
+* add ZC0003, ZC0004 and ZC0005 diagnostic pages and list all five rules ([195d0c2](https://github.com/ZeroAlloc-Net/ZeroAlloc.Cache/commit/195d0c2a49e0c43957f13fcaaeb07d94bdd95f5f))
+
+
+### Build System
+
+* pack the source generator from GetTargetPath instead of a bin path ([#176](https://github.com/ZeroAlloc-Net/ZeroAlloc.Cache/issues/176)) ([ec8c36c](https://github.com/ZeroAlloc-Net/ZeroAlloc.Cache/commit/ec8c36c797c5eb182ee65569aac61b6ce001b50c))
+
 ## [1.1.49](https://github.com/ZeroAlloc-Net/ZeroAlloc.Cache/compare/v1.1.48...v1.1.49) (2026-09-27)
 
 
