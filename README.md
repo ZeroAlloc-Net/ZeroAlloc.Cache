@@ -120,7 +120,7 @@ services.AddOpenTelemetry()
 | [ZC0001](https://github.com/ZeroAlloc-Net/ZeroAlloc.Cache/blob/main/docs/diagnostics/ZC0001.md) | Warning | `Sliding = true` combined with `UseHybridCache = true` — sliding TTL is silently ignored by the distributed (L2) tier |
 | [ZC0002](https://github.com/ZeroAlloc-Net/ZeroAlloc.Cache/blob/main/docs/diagnostics/ZC0002.md) | Warning | A cache key parameter is a reference type (excluding `string`) — `ToString()` may not produce a stable unique key |
 | [ZC0003](https://github.com/ZeroAlloc-Net/ZeroAlloc.Cache/blob/main/docs/diagnostics/ZC0003.md) | Error | `UseHybridCache = true` without a reference to `Microsoft.Extensions.Caching.Hybrid` — no proxy is generated for the interface |
-| [ZC0004](https://github.com/ZeroAlloc-Net/ZeroAlloc.Cache/blob/main/docs/diagnostics/ZC0004.md) | Warning | Methods on one interface set different `MaxEntries` values — they share one isolated cache sized by the first value |
+| [ZC0004](https://github.com/ZeroAlloc-Net/ZeroAlloc.Cache/blob/main/docs/diagnostics/ZC0004.md) | Warning | Bounded methods on one interface set different `MaxEntries` values — they share one size-limited cache sized by the first bounded method |
 | [ZC0005](https://github.com/ZeroAlloc-Net/ZeroAlloc.Cache/blob/main/docs/diagnostics/ZC0005.md) | Warning | `[Cache]` on a method that does not return `Task<T>` or `ValueTask<T>` — caching is not applied |
 
 ---

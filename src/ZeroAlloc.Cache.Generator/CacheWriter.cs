@@ -84,11 +84,6 @@ internal static class CacheWriter
     private static string BoundedCacheHolderName(string interfaceName) =>
         $"{interfaceName}BoundedCache";
 
-    // Methods with MaxEntries > 0 use the isolated size-limited cache; every other non-hybrid
-    // method uses the shared DI IMemoryCache, whatever else the interface declares. See #180.
-    private static bool UsesBoundedCache(CachedMethodModel m) =>
-        !m.EffectiveConfig.UseHybridCache && m.EffectiveConfig.MaxEntries > 0;
-
     private static string StripInterfacePrefix(string name)
     {
         if (name.Length > 1 && name[0] == 'I' && char.IsUpper(name[1]))
@@ -248,7 +243,7 @@ internal static class CacheWriter
         // `T?` for a struct T is Nullable<T>; appending '?' to an already-nullable T would emit
         // `int??`, which does not parse. See #122.
         var cachedDeclType = m.InnerIsNullable ? m.InnerReturnTypeFqn : $"{m.InnerReturnTypeFqn}?";
-        var cacheField = UsesBoundedCache(m) ? "_boundedCache" : "_cache";
+        var cacheField = m.UsesBoundedCache ? "_boundedCache" : "_cache";
         sb.AppendLine($"        if ({cacheField}.TryGetValue(__key, out {cachedDeclType} __cached))");
         sb.AppendLine("        {");
         sb.AppendLine($"            _hits.Add(1, new global::System.Collections.Generic.KeyValuePair<string, object?>(\"method\", \"{m.Name}\"));");
@@ -280,7 +275,7 @@ internal static class CacheWriter
     {
         // The size-limited bounded cache rejects entries without a Size; the shared IMemoryCache
         // is not size-limited, so its entries carry none.
-        bool isolated = UsesBoundedCache(m);
+        bool isolated = m.UsesBoundedCache;
         // Always use MemoryCacheEntryOptions so we can attach the eviction callback.
         sb.AppendLine($"        {cacheField}.Set(__key, __result, new global::Microsoft.Extensions.Caching.Memory.MemoryCacheEntryOptions");
 

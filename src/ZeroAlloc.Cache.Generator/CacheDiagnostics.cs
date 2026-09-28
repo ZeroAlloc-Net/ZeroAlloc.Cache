@@ -49,7 +49,7 @@ internal static class CacheDiagnostics
     public static readonly DiagnosticDescriptor MixedMaxEntriesValues = new(
         id: "ZC0004",
         title: "Mixed MaxEntries values",
-        messageFormat: "Interface '{0}': multiple methods specify different MaxEntries values. All methods share a single isolated MemoryCache; the first MaxEntries value ({1}) is used as SizeLimit.",
+        messageFormat: "Interface '{0}': bounded methods specify different MaxEntries values. The bounded methods of an interface share one size-limited cache; the first bounded method's MaxEntries ({1}) sets its SizeLimit.",
         category: Category,
         defaultSeverity: DiagnosticSeverity.Warning,
         isEnabledByDefault: true);

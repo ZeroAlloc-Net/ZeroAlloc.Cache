@@ -102,6 +102,30 @@ public class MixedCacheLayoutTests
             .Which.Should().NotContain("SizeLimit", "no method uses the size-limited cache");
     }
 
+    // Hybrid methods do not use the bounded cache, so a hybrid method's MaxEntries must not set
+    // its SizeLimit, even when it is declared first.
+    [Fact]
+    public void BoundedCacheSizeLimit_ComesFromFirstNonHybridBoundedMethod()
+    {
+        const string source = """
+            using System.Threading;
+            using System.Threading.Tasks;
+            using ZeroAlloc.Cache;
+
+            public interface IProductRepository
+            {
+                [Cache(TtlMs = 60_000, MaxEntries = 100, UseHybridCache = true)]
+                ValueTask<string?> FindAsync(string query, CancellationToken ct);
+
+                [Cache(TtlMs = 60_000, MaxEntries = 500)]
+                ValueTask<string?> GetByIdAsync(int id, CancellationToken ct);
+            }
+            """;
+
+        var generated = TestHelper.GetGeneratedSources(source).Should().ContainSingle().Subject;
+        generated.Should().Contain("SizeLimit = 500").And.NotContain("SizeLimit = 100");
+    }
+
     [Fact]
     public async Task InternalInterface_BoundedAndUnbounded_GeneratesCompilableCode()
     {
