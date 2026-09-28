@@ -41,7 +41,7 @@ internal static class CacheDiagnostics
     public static readonly DiagnosticDescriptor CacheAttributeIgnored = new(
         id: "ZC0005",
         title: "[Cache] ignored — return type cannot be cached",
-        messageFormat: "Method '{0}' is marked [Cache] but returns '{1}', which has no cacheable value. Caching is not applied and the method is called every time. Return Task<T> or ValueTask<T> to enable caching.",
+        messageFormat: "Method '{0}' is marked [Cache] but returns '{1}'. Only Task<T> and ValueTask<T> results can be cached. Caching is not applied and the method is called every time. Return Task<T> or ValueTask<T> to enable caching.",
         category: Category,
         defaultSeverity: DiagnosticSeverity.Warning,
         isEnabledByDefault: true);

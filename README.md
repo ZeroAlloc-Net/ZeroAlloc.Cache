@@ -66,7 +66,7 @@ Full methodology + design analysis: [docs/performance.md](https://github.com/Zer
 | `IMemoryCache` (default) | In-process L1 cache; no extra dependencies |
 | `HybridCache` (opt-in) | L1 + L2 distributed cache via `Microsoft.Extensions.Caching.Hybrid` |
 | Method-level override | Any `[Cache]` on a method shadows the interface-level config for that method |
-| `MaxEntries` | Isolates the method in its own `MemoryCache` instance with a `SizeLimit` |
+| `MaxEntries` | Moves the method to an isolated `MemoryCache` with a `SizeLimit`, shared by all bounded methods of the interface |
 | Compile-time key | Cache key expression is emitted by the generator — zero key-building overhead on hit |
 | AOT / trimmer safe | Generated proxy is concrete; no reflection at runtime |
 | DI integration | Generated `Add{Service}Cache<TImpl>()` extension registers everything, e.g. `AddProductRepositoryCache` for `IProductRepository` |
@@ -119,6 +119,9 @@ services.AddOpenTelemetry()
 |----|----------|-------------|
 | [ZC0001](https://github.com/ZeroAlloc-Net/ZeroAlloc.Cache/blob/main/docs/diagnostics/ZC0001.md) | Warning | `Sliding = true` combined with `UseHybridCache = true` — sliding TTL is silently ignored by the distributed (L2) tier |
 | [ZC0002](https://github.com/ZeroAlloc-Net/ZeroAlloc.Cache/blob/main/docs/diagnostics/ZC0002.md) | Warning | A cache key parameter is a reference type (excluding `string`) — `ToString()` may not produce a stable unique key |
+| [ZC0003](https://github.com/ZeroAlloc-Net/ZeroAlloc.Cache/blob/main/docs/diagnostics/ZC0003.md) | Error | `UseHybridCache = true` without a reference to `Microsoft.Extensions.Caching.Hybrid` — no proxy is generated for the interface |
+| [ZC0004](https://github.com/ZeroAlloc-Net/ZeroAlloc.Cache/blob/main/docs/diagnostics/ZC0004.md) | Warning | Methods on one interface set different `MaxEntries` values — they share one isolated cache sized by the first value |
+| [ZC0005](https://github.com/ZeroAlloc-Net/ZeroAlloc.Cache/blob/main/docs/diagnostics/ZC0005.md) | Warning | `[Cache]` on a method that does not return `Task<T>` or `ValueTask<T>` — caching is not applied |
 
 ---
 
@@ -128,7 +131,7 @@ Full docs live in [`docs/`](https://github.com/ZeroAlloc-Net/ZeroAlloc.Cache/blo
 
 - [Getting Started](https://github.com/ZeroAlloc-Net/ZeroAlloc.Cache/blob/main/docs/getting-started.md)
 - [Attribute Reference](https://github.com/ZeroAlloc-Net/ZeroAlloc.Cache/blob/main/docs/attributes.md)
-- Diagnostics: [ZC0001](https://github.com/ZeroAlloc-Net/ZeroAlloc.Cache/blob/main/docs/diagnostics/ZC0001.md) · [ZC0002](https://github.com/ZeroAlloc-Net/ZeroAlloc.Cache/blob/main/docs/diagnostics/ZC0002.md)
+- Diagnostics: [ZC0001](https://github.com/ZeroAlloc-Net/ZeroAlloc.Cache/blob/main/docs/diagnostics/ZC0001.md) · [ZC0002](https://github.com/ZeroAlloc-Net/ZeroAlloc.Cache/blob/main/docs/diagnostics/ZC0002.md) · [ZC0003](https://github.com/ZeroAlloc-Net/ZeroAlloc.Cache/blob/main/docs/diagnostics/ZC0003.md) · [ZC0004](https://github.com/ZeroAlloc-Net/ZeroAlloc.Cache/blob/main/docs/diagnostics/ZC0004.md) · [ZC0005](https://github.com/ZeroAlloc-Net/ZeroAlloc.Cache/blob/main/docs/diagnostics/ZC0005.md)
 
 ---
 

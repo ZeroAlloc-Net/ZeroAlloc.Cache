@@ -158,19 +158,19 @@ public sealed class CacheGenerator : IIncrementalGenerator
         BuildParamStrings(method, out var paramList, out var argList,
             out var keyArgs, out var hasCt, out var ctParamName, out var keyParams);
 
-        // A method is passthrough if there is no effective config, OR if the return type
-        // is non-generic (e.g. ValueTask, Task, void) — there is no cacheable value to store.
-        // We always treat non-generic returns as passthrough even with explicit [Cache] to
-        // avoid emitting broken generated code (caching ValueTask with no T is meaningless).
-        bool isNonGenericReturn = method.ReturnType is not INamedTypeSymbol { IsGenericType: true };
-        bool isPassthrough = effectiveConfig == null || isNonGenericReturn;
+        // A method is passthrough if there is no effective config, OR if it does not return
+        // Task<T> or ValueTask<T>, the only shapes the emitted async cache path can await and store.
+        // Checking "any generic type" let synchronous List<T>, int? or IAsyncEnumerable<T> through,
+        // and the generated proxy then failed to compile with CS1983.
+        bool isUncacheableReturn = !IsCacheableReturnType(method.ReturnType);
+        bool isPassthrough = effectiveConfig == null || isUncacheableReturn;
 
         if (isPassthrough)
         {
             // An explicit [Cache] that cannot be honoured must say so. Silently emitting a
             // passthrough left the author believing caching was active while the inner method
             // ran on every call (#121).
-            if (methodAttr != null && isNonGenericReturn)
+            if (methodAttr != null && isUncacheableReturn)
             {
                 diagnostics.Add(Microsoft.CodeAnalysis.Diagnostic.Create(
                     CacheDiagnostics.CacheAttributeIgnored,
@@ -186,6 +186,17 @@ public sealed class CacheGenerator : IIncrementalGenerator
         EmitDiagnostics(method, effectiveConfig!, keyParams, diagnostics);
         AddCachedMethod(method, effectiveConfig!, paramList, argList, keyArgs,
             hasCt, ctParamName, keyParams, cachedMethods);
+    }
+
+    private static bool IsCacheableReturnType(ITypeSymbol returnType)
+    {
+        if (returnType is not INamedTypeSymbol { IsGenericType: true, TypeArguments.Length: 1 } named)
+            return false;
+
+        var definition = named.OriginalDefinition;
+        return string.Equals(definition.ContainingNamespace?.ToDisplayString(), "System.Threading.Tasks", System.StringComparison.Ordinal)
+            && (string.Equals(definition.MetadataName, "Task`1", System.StringComparison.Ordinal)
+                || string.Equals(definition.MetadataName, "ValueTask`1", System.StringComparison.Ordinal));
     }
 
     private static void BuildParamStrings(
@@ -386,12 +397,16 @@ public sealed class CacheGenerator : IIncrementalGenerator
         if (!cachedMethods.Exists(static m => m.EffectiveConfig.UseHybridCache))
             return;
 
-        var hybridCacheType = ctx.SemanticModel.Compilation
-            .GetTypeByMetadataName("Microsoft.Extensions.Caching.Hybrid.HybridCache");
-        if (hybridCacheType is not null)
+        // Probe for the AddHybridCache() extension the generated DI registration calls, not for the
+        // HybridCache type. HybridCache itself lives in Microsoft.Extensions.Caching.Abstractions 9.0+,
+        // which ZeroAlloc.Cache always brings in, so probing it never fired: a net8.0 consumer
+        // without the Microsoft.Extensions.Caching.Hybrid package got CS1061 in generated code.
+        var addHybridCacheType = ctx.SemanticModel.Compilation
+            .GetTypeByMetadataName("Microsoft.Extensions.DependencyInjection.HybridCacheServiceExtensions");
+        if (addHybridCacheType is not null)
             return;
 
-        // HybridCache assembly not referenced — emit an error
+        // Microsoft.Extensions.Caching.Hybrid not referenced — emit an error
         Location? firstLoc = null;
         foreach (var loc in symbol.Locations) { firstLoc = loc; break; }
         diagnostics.Add(Microsoft.CodeAnalysis.Diagnostic.Create(
