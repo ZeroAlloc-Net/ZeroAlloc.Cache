@@ -6,6 +6,12 @@ internal sealed record CacheModel(
     string InterfaceName,
     string InterfaceFqn,
     string HintName,            // unique within the compilation, see HintNames.ForHost
+    string DisplayName,         // as diagnostics name the interface, e.g. "N.Outer.IFoo"
+    LocationInfo? Location,     // the interface's name, where ZC0010 points
+    ImmutableArray<string> ContainingDeclarations, // partial headers of the containing types, outermost first
+    string NestedTypePrefix,    // "" at the top of a namespace, else e.g. "global::N.Outer." for the proxy and holder
+    string KeyName,             // names the interface in cache keys and telemetry, e.g. "Outer.IFoo"
+    string ExtensionMethodName, // e.g. "AddFooCache", or "AddOuter_FooCache" when nested
     bool IsPubliclyAccessible,  // false => emit the proxy and DI extension as internal
     bool AnyMethodUsesHybridCache,
     bool AnyMethodUsesIMemoryCache,
@@ -24,6 +30,23 @@ internal sealed record CacheModel(
     /// </summary>
     public bool UsesSpanKeyLookup(CachedMethodModel m) =>
         SpanKeyLookupAvailable && !m.EffectiveConfig.UseHybridCache && !m.KeyParams.IsEmpty;
+
+    /// <summary>
+    /// A proxy is written for the interface: it has methods and no error. An interface that
+    /// cannot be generated keeps only the diagnostic that says why.
+    /// </summary>
+    public bool IsGenerated
+    {
+        get
+        {
+            if (CachedMethods.Length == 0 && PassthroughMethods.Length == 0) return false;
+            foreach (var d in Diagnostics)
+            {
+                if (d.Descriptor.DefaultSeverity == Microsoft.CodeAnalysis.DiagnosticSeverity.Error) return false;
+            }
+            return true;
+        }
+    }
 
     /// <summary>A method on the shared IMemoryCache uses the span lookup, so the proxy needs the MemoryCache field.</summary>
     public bool NeedsSharedMemoryCacheField
@@ -48,6 +71,12 @@ internal sealed record CacheModel(
             && string.Equals(InterfaceName, other.InterfaceName, System.StringComparison.Ordinal)
             && string.Equals(InterfaceFqn, other.InterfaceFqn, System.StringComparison.Ordinal)
             && string.Equals(HintName, other.HintName, System.StringComparison.Ordinal)
+            && string.Equals(DisplayName, other.DisplayName, System.StringComparison.Ordinal)
+            && Equals(Location, other.Location)
+            && ArraysEqual(ContainingDeclarations, other.ContainingDeclarations)
+            && string.Equals(NestedTypePrefix, other.NestedTypePrefix, System.StringComparison.Ordinal)
+            && string.Equals(KeyName, other.KeyName, System.StringComparison.Ordinal)
+            && string.Equals(ExtensionMethodName, other.ExtensionMethodName, System.StringComparison.Ordinal)
             && IsPubliclyAccessible == other.IsPubliclyAccessible
             && AnyMethodUsesHybridCache == other.AnyMethodUsesHybridCache
             && AnyMethodUsesIMemoryCache == other.AnyMethodUsesIMemoryCache

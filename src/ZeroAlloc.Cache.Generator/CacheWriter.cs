@@ -19,22 +19,57 @@ internal static class CacheWriter
             sb.AppendLine();
         }
 
-        // Proxy class
-        WriteProxy(sb, model);
-        sb.AppendLine();
-
-        // Container-lifetime holder for the size-limited cache of the MaxEntries methods
-        if (model.AnyMethodUsesIsolatedCache)
-        {
-            WriteBoundedCacheHolder(sb, model);
-            sb.AppendLine();
-        }
+        // Proxy class, and the container-lifetime holder for the size-limited cache of the
+        // MaxEntries methods, inside the containing types of a nested interface
+        WriteNestedTypes(sb, model);
 
         // DI extension
         WriteDiExtension(sb, model);
 
         // Add source
         ctx.AddSource(model.HintName, SourceText.From(sb.ToString(), Encoding.UTF8));
+    }
+
+    /// <summary>
+    /// Writes the proxy and the bounded-cache holder. For a nested interface they go inside
+    /// partial declarations of its containing types, outermost first, so same-named interfaces
+    /// nested in different types get distinct proxies. See #194.
+    /// </summary>
+    private static void WriteNestedTypes(StringBuilder sb, CacheModel model)
+    {
+        var types = new StringBuilder();
+        WriteProxy(types, model);
+        types.AppendLine();
+        if (model.AnyMethodUsesIsolatedCache)
+        {
+            WriteBoundedCacheHolder(types, model);
+            types.AppendLine();
+        }
+
+        var depth = model.ContainingDeclarations.Length;
+        if (depth == 0)
+        {
+            sb.Append(types);
+            return;
+        }
+
+        for (var level = 0; level < depth; level++)
+        {
+            sb.Append(' ', level * 4).AppendLine(model.ContainingDeclarations[level]);
+            sb.Append(' ', level * 4).AppendLine("{");
+        }
+
+        // The generated code holds no multi-line literal, so every line can be indented as a whole.
+        var lines = types.ToString().TrimEnd().Split(new[] { "\r\n", "\n" }, System.StringSplitOptions.None);
+        foreach (var line in lines)
+        {
+            if (line.Length > 0) sb.Append(' ', depth * 4).Append(line);
+            sb.AppendLine();
+        }
+
+        for (var level = depth - 1; level >= 0; level--)
+            sb.Append(' ', level * 4).AppendLine("}");
+        sb.AppendLine();
     }
 
     private static void WriteHeader(StringBuilder sb, CacheModel model)
@@ -84,13 +119,6 @@ internal static class CacheWriter
     // Methods with MaxEntries > 0 use the isolated size-limited cache; every other non-hybrid
     // method uses the shared DI IMemoryCache, whatever else the interface declares. See #180.
     private static bool UsesBoundedCache(CachedMethodModel m) => m.UsesBoundedCache;
-
-    private static string StripInterfacePrefix(string name)
-    {
-        if (name.Length > 1 && name[0] == 'I' && char.IsUpper(name[1]))
-            return name.Substring(1);
-        return name;
-    }
 
     private static void WriteProxyFields(StringBuilder sb, string ifaceFqn, CacheModel model)
     {
@@ -233,9 +261,9 @@ internal static class CacheWriter
         foreach (var m in model.CachedMethods)
         {
             if (m.EffectiveConfig.UseHybridCache)
-                WriteHybridCachedMethod(sb, model.InterfaceName, m);
+                WriteHybridCachedMethod(sb, model.KeyName, m);
             else
-                WriteCachedMethod(sb, model.InterfaceName, m, model.UsesSpanKeyLookup(m));
+                WriteCachedMethod(sb, model.KeyName, m, model.UsesSpanKeyLookup(m));
         }
 
         // Passthrough methods
@@ -475,8 +503,10 @@ internal static class CacheWriter
     private static void WriteDiExtension(StringBuilder sb, CacheModel model)
     {
         var ifaceFqn = $"global::{model.InterfaceFqn}";
-        var proxyName = $"{model.InterfaceName}CacheProxy";
-        var methodName = $"Add{StripInterfacePrefix(model.InterfaceName)}Cache";
+        // The extension sits at namespace level; the proxy and holder of a nested interface sit in
+        // its containing types, so they are named through them.
+        var proxyName = $"{model.NestedTypePrefix}{model.InterfaceName}CacheProxy";
+        var methodName = model.ExtensionMethodName;
 
         bool anyIMemoryCache = model.AnyMethodUsesIMemoryCache;
         bool anyHybridCache = model.AnyMethodUsesHybridCache;
@@ -503,7 +533,7 @@ internal static class CacheWriter
         {
             // Factory registration: the container disposes singletons it creates, but not
             // pre-built instances handed to it.
-            var holderName = BoundedCacheHolderName(model.InterfaceName);
+            var holderName = model.NestedTypePrefix + BoundedCacheHolderName(model.InterfaceName);
             sb.AppendLine("        global::Microsoft.Extensions.DependencyInjection.Extensions.ServiceCollectionDescriptorExtensions");
             sb.AppendLine($"            .TryAddSingleton<{holderName}>(services, static _ => new {holderName}());");
         }
@@ -524,7 +554,7 @@ internal static class CacheWriter
         if (model.AnyMethodUsesIMemoryCache)
             arguments.Add("sp.GetRequiredService<global::Microsoft.Extensions.Caching.Memory.IMemoryCache>()");
         if (model.AnyMethodUsesIsolatedCache)
-            arguments.Add($"sp.GetRequiredService<{BoundedCacheHolderName(model.InterfaceName)}>()");
+            arguments.Add($"sp.GetRequiredService<{model.NestedTypePrefix}{BoundedCacheHolderName(model.InterfaceName)}>()");
         if (model.AnyMethodUsesHybridCache)
             arguments.Add("sp.GetRequiredService<global::Microsoft.Extensions.Caching.Hybrid.HybridCache>()");
 

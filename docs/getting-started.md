@@ -44,6 +44,25 @@ This registers:
 
 No manual factory wiring is required.
 
+### Nested interfaces
+
+An interface nested in another type works too. Its proxy is generated inside the containing type, so every containing type must be `partial`, or the generator reports [ZC0006](diagnostics/ZC0006.md). The extension method sits at namespace level and is named after the containing types, joined with underscores: `Catalog.IProductLookup` produces `AddCatalog_ProductLookupCache`.
+
+```csharp
+public static partial class Catalog
+{
+    [Cache(TtlMs = 60_000)]
+    public interface IProductLookup
+    {
+        ValueTask<Product?> GetByIdAsync(int id, CancellationToken ct);
+    }
+}
+
+builder.Services.AddCatalog_ProductLookupCache<ProductLookupImpl>();
+```
+
+The extension method cannot name a type parameter or a private type, so a generic interface, an interface nested in a generic type, and a `private` or `protected` nested interface get no proxy; see [ZC0007](diagnostics/ZC0007.md) and [ZC0008](diagnostics/ZC0008.md). A `file` interface cannot be referred to from a generated file; see [ZC0009](diagnostics/ZC0009.md).
+
 ---
 
 ## 4. Inject and use

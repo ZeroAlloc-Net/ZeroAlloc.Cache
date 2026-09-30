@@ -260,4 +260,34 @@ public sealed class SnapshotTests
             """;
         TestHelper.Verify(source);
     }
+
+    // A nested interface: the proxy and the bounded-cache holder go inside partial declarations of
+    // the containing types; the DI extension stays at namespace level and names them through them. #194
+    [Fact]
+    public void NestedInterface_GeneratesProxyInsideContainingTypes()
+    {
+        var source = """
+            using ZeroAlloc.Cache;
+            using System.Threading;
+            using System.Threading.Tasks;
+            namespace T;
+            public static partial class Orders
+            {
+                public partial record struct Queries
+                {
+                    public interface IMyService
+                    {
+                        [Cache(TtlMs = 30_000)]
+                        ValueTask<string> GetAsync(string id, CancellationToken ct);
+
+                        [Cache(TtlMs = 30_000, MaxEntries = 100)]
+                        ValueTask<int> CountAsync(int id, CancellationToken ct);
+
+                        ValueTask SaveAsync(string data, CancellationToken ct);
+                    }
+                }
+            }
+            """;
+        TestHelper.Verify(source);
+    }
 }

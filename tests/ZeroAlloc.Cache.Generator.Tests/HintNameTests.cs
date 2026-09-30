@@ -10,8 +10,8 @@ namespace ZeroAlloc.Cache.Generator.Tests;
 /// and the generator then produced nothing for the whole project with CS8785. #193
 /// </summary>
 /// <remarks>
-/// The code generated for nested and generic interfaces does not compile yet (#194), so those
-/// tests check the file names only.
+/// Generic interfaces, and interfaces nested in a generic type, are reported with ZC0007 and get
+/// no file (#194), so for those only the non-generic file remains.
 /// </remarks>
 public sealed class HintNameTests
 {
@@ -55,21 +55,9 @@ public sealed class HintNameTests
             }
             """;
 
-        TestHelper.GetGeneratedFileNames(source).Should()
-            .BeEquivalentTo("N.Outer1+IFoo.Cache.g.cs", "N.Outer2+IFoo.Cache.g.cs");
-    }
-
-    [Fact]
-    public void NestedInGenericContainer_CarriesArity()
-    {
-        var source = $$"""
-            namespace N
-            {
-                public partial class Outer<T> { {{Iface("IFoo")}} }
-            }
-            """;
-
-        TestHelper.GetGeneratedFileNames(source).Should().Equal("N.Outer`1+IFoo.Cache.g.cs");
+        var run = TestHelper.Run(source);
+        run.HintNames.Should().BeEquivalentTo("N.Outer1+IFoo.Cache.g.cs", "N.Outer2+IFoo.Cache.g.cs");
+        run.ShouldCompileCleanly();
     }
 
     [Fact]
@@ -83,8 +71,10 @@ public sealed class HintNameTests
             }
             """;
 
-        TestHelper.GetGeneratedFileNames(source).Should()
-            .BeEquivalentTo("N.IFoo.Cache.g.cs", "N.IFoo`1.Cache.g.cs");
+        var run = TestHelper.Run(source);
+        run.HintNames.Should().Equal("N.IFoo.Cache.g.cs");
+        run.GeneratorDiagnostics.Select(d => d.Id).Should().Equal("ZC0007");
+        run.CompileErrors.Should().BeEmpty();
     }
 
     [Fact]
@@ -98,8 +88,9 @@ public sealed class HintNameTests
             namespace N.Outer2 { {{Iface("IFoo")}} }
             """;
 
-        TestHelper.GetGeneratedFileNames(source).Should()
-            .BeEquivalentTo("N.Outer+IFoo.Cache.g.cs", "N.Outer2.IFoo.Cache.g.cs");
+        var run = TestHelper.Run(source);
+        run.HintNames.Should().BeEquivalentTo("N.Outer+IFoo.Cache.g.cs", "N.Outer2.IFoo.Cache.g.cs");
+        run.ShouldCompileCleanly();
     }
 
     [Fact]
@@ -109,7 +100,9 @@ public sealed class HintNameTests
             namespace @event { {{Iface("IÜber")}} }
             """;
 
-        TestHelper.GetGeneratedFileNames(source).Should().Equal("event.IÜber.Cache.g.cs");
+        var run = TestHelper.Run(source);
+        run.HintNames.Should().Equal("event.IÜber.Cache.g.cs");
+        run.ShouldCompileCleanly();
     }
 
     [Theory]

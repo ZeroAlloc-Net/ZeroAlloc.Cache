@@ -88,7 +88,7 @@ Each entry is stored under the string `{Interface}.{Method}:{arg1}:{arg2}`, buil
 cache.Remove($"IProductRepository.GetByIdAsync:{id}");
 ```
 
-`HybridCache` methods use the same key text.
+`HybridCache` methods use the same key text. For an interface nested in another type, `{Interface}` starts with the containing types, as in `Catalog.IProductLookup.GetByIdAsync:42`.
 
 ---
 
@@ -132,6 +132,11 @@ services.AddOpenTelemetry()
 | [ZC0003](https://github.com/ZeroAlloc-Net/ZeroAlloc.Cache/blob/main/docs/diagnostics/ZC0003.md) | Error | `UseHybridCache = true` without a reference to `Microsoft.Extensions.Caching.Hybrid` — no proxy is generated for the interface |
 | [ZC0004](https://github.com/ZeroAlloc-Net/ZeroAlloc.Cache/blob/main/docs/diagnostics/ZC0004.md) | Warning | Bounded methods on one interface set different `MaxEntries` values — they share one size-limited cache sized by the first bounded method |
 | [ZC0005](https://github.com/ZeroAlloc-Net/ZeroAlloc.Cache/blob/main/docs/diagnostics/ZC0005.md) | Warning | `[Cache]` on a method that does not return `Task<T>` or `ValueTask<T>` — caching is not applied |
+| [ZC0006](https://github.com/ZeroAlloc-Net/ZeroAlloc.Cache/blob/main/docs/diagnostics/ZC0006.md) | Warning | A nested interface whose containing type is not `partial` — no proxy is generated for it |
+| [ZC0007](https://github.com/ZeroAlloc-Net/ZeroAlloc.Cache/blob/main/docs/diagnostics/ZC0007.md) | Warning | A generic interface, or one nested in a generic type — no proxy is generated for it |
+| [ZC0008](https://github.com/ZeroAlloc-Net/ZeroAlloc.Cache/blob/main/docs/diagnostics/ZC0008.md) | Warning | A private or protected nested interface, which the namespace-level `Add…Cache` method cannot name — no proxy is generated for it |
+| [ZC0009](https://github.com/ZeroAlloc-Net/ZeroAlloc.Cache/blob/main/docs/diagnostics/ZC0009.md) | Error | A file-local interface — no proxy is generated for it |
+| [ZC0010](https://github.com/ZeroAlloc-Net/ZeroAlloc.Cache/blob/main/docs/diagnostics/ZC0010.md) | Error | An interface whose name differs only in case from another's — only the first is generated |
 
 ---
 
@@ -141,7 +146,7 @@ Full docs live in [`docs/`](https://github.com/ZeroAlloc-Net/ZeroAlloc.Cache/blo
 
 - [Getting Started](https://github.com/ZeroAlloc-Net/ZeroAlloc.Cache/blob/main/docs/getting-started.md)
 - [Attribute Reference](https://github.com/ZeroAlloc-Net/ZeroAlloc.Cache/blob/main/docs/attributes.md)
-- Diagnostics: [ZC0001](https://github.com/ZeroAlloc-Net/ZeroAlloc.Cache/blob/main/docs/diagnostics/ZC0001.md) · [ZC0002](https://github.com/ZeroAlloc-Net/ZeroAlloc.Cache/blob/main/docs/diagnostics/ZC0002.md) · [ZC0003](https://github.com/ZeroAlloc-Net/ZeroAlloc.Cache/blob/main/docs/diagnostics/ZC0003.md) · [ZC0004](https://github.com/ZeroAlloc-Net/ZeroAlloc.Cache/blob/main/docs/diagnostics/ZC0004.md) · [ZC0005](https://github.com/ZeroAlloc-Net/ZeroAlloc.Cache/blob/main/docs/diagnostics/ZC0005.md)
+- Diagnostics: [ZC0001](https://github.com/ZeroAlloc-Net/ZeroAlloc.Cache/blob/main/docs/diagnostics/ZC0001.md) · [ZC0002](https://github.com/ZeroAlloc-Net/ZeroAlloc.Cache/blob/main/docs/diagnostics/ZC0002.md) · [ZC0003](https://github.com/ZeroAlloc-Net/ZeroAlloc.Cache/blob/main/docs/diagnostics/ZC0003.md) · [ZC0004](https://github.com/ZeroAlloc-Net/ZeroAlloc.Cache/blob/main/docs/diagnostics/ZC0004.md) · [ZC0005](https://github.com/ZeroAlloc-Net/ZeroAlloc.Cache/blob/main/docs/diagnostics/ZC0005.md) · [ZC0006](https://github.com/ZeroAlloc-Net/ZeroAlloc.Cache/blob/main/docs/diagnostics/ZC0006.md) · [ZC0007](https://github.com/ZeroAlloc-Net/ZeroAlloc.Cache/blob/main/docs/diagnostics/ZC0007.md) · [ZC0008](https://github.com/ZeroAlloc-Net/ZeroAlloc.Cache/blob/main/docs/diagnostics/ZC0008.md) · [ZC0009](https://github.com/ZeroAlloc-Net/ZeroAlloc.Cache/blob/main/docs/diagnostics/ZC0009.md) · [ZC0010](https://github.com/ZeroAlloc-Net/ZeroAlloc.Cache/blob/main/docs/diagnostics/ZC0010.md)
 
 ---
 
