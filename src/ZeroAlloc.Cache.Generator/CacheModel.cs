@@ -5,6 +5,7 @@ internal sealed record CacheModel(
     string? Namespace,
     string InterfaceName,
     string InterfaceFqn,
+    string HintName,            // unique within the compilation, see HintNames.ForHost
     bool IsPubliclyAccessible,  // false => emit the proxy and DI extension as internal
     bool AnyMethodUsesHybridCache,
     bool AnyMethodUsesIMemoryCache,
@@ -46,6 +47,7 @@ internal sealed record CacheModel(
         return string.Equals(Namespace, other.Namespace, System.StringComparison.Ordinal)
             && string.Equals(InterfaceName, other.InterfaceName, System.StringComparison.Ordinal)
             && string.Equals(InterfaceFqn, other.InterfaceFqn, System.StringComparison.Ordinal)
+            && string.Equals(HintName, other.HintName, System.StringComparison.Ordinal)
             && IsPubliclyAccessible == other.IsPubliclyAccessible
             && AnyMethodUsesHybridCache == other.AnyMethodUsesHybridCache
             && AnyMethodUsesIMemoryCache == other.AnyMethodUsesIMemoryCache

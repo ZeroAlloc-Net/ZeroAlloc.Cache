@@ -34,10 +34,7 @@ internal static class CacheWriter
         WriteDiExtension(sb, model);
 
         // Add source
-        var hint = model.Namespace != null
-            ? $"{model.Namespace}_{model.InterfaceName}.Cache.g.cs"
-            : $"{model.InterfaceName}.Cache.g.cs";
-        ctx.AddSource(hint, SourceText.From(sb.ToString(), Encoding.UTF8));
+        ctx.AddSource(model.HintName, SourceText.From(sb.ToString(), Encoding.UTF8));
     }
 
     private static void WriteHeader(StringBuilder sb, CacheModel model)
