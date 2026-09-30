@@ -4,6 +4,18 @@ All notable changes to this project are documented here. The format is based on
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the project follows
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.1.53](https://github.com/ZeroAlloc-Net/ZeroAlloc.Cache/compare/v1.1.52...v1.1.53) (2026-09-30)
+
+
+### Bug Fixes
+
+* generate a partial interface with attributes in several parts once instead of stopping the generator ([220366a](https://github.com/ZeroAlloc-Net/ZeroAlloc.Cache/commit/220366a4eebb48b3ea1034c19e38c5594dd2754f))
+* generate nested [Cache] interfaces inside their containing types, and report the ones that cannot be generated ([220366a](https://github.com/ZeroAlloc-Net/ZeroAlloc.Cache/commit/220366a4eebb48b3ea1034c19e38c5594dd2754f))
+* leave the accessibility off an internal interface's extension class part, so public and internal interfaces can share a namespace ([4f0df08](https://github.com/ZeroAlloc-Net/ZeroAlloc.Cache/commit/4f0df08af1eb12fe40ec16a32412d2a677276349))
+* name generated files after the interface's namespace and containing types ([#195](https://github.com/ZeroAlloc-Net/ZeroAlloc.Cache/issues/195)) ([9ea4585](https://github.com/ZeroAlloc-Net/ZeroAlloc.Cache/commit/9ea4585d1558210e8c104088074e82d12c3f001c)), closes [#193](https://github.com/ZeroAlloc-Net/ZeroAlloc.Cache/issues/193)
+* qualify cache keys and Add...Cache names only where two interfaces share them ([4f0df08](https://github.com/ZeroAlloc-Net/ZeroAlloc.Cache/commit/4f0df08af1eb12fe40ec16a32412d2a677276349))
+* report interfaces whose names differ only in case instead of stopping the generator ([220366a](https://github.com/ZeroAlloc-Net/ZeroAlloc.Cache/commit/220366a4eebb48b3ea1034c19e38c5594dd2754f))
+
 ## [1.1.52](https://github.com/ZeroAlloc-Net/ZeroAlloc.Cache/compare/v1.1.51...v1.1.52) (2026-09-30)
 
 
