@@ -30,8 +30,8 @@ public class CacheHitShapeTests
         }
         """;
 
-    private static string Generate(string returnType, string attribute) =>
-        string.Join("\n", TestHelper.GetGeneratedSources(Source(returnType, attribute)));
+    private static string Generate(string returnType, string attribute, bool net8MemoryCache) =>
+        string.Join("\n", TestHelper.GetGeneratedSources(Source(returnType, attribute), net8MemoryCache));
 
     [Theory]
     [InlineData("ValueTask<int>", "__boxed is int __cached", "return __cached;")]
@@ -44,32 +44,49 @@ public class CacheHitShapeTests
     [InlineData("ValueTask<string?>", "__boxed is null or string", "return (string?)__boxed;")]
     public void HitPath_TestsTheConcreteType(string returnType, string condition, string hitReturn)
     {
-        var generated = Generate(returnType, Unbounded);
+        // net8.0: the string key lookup.
+        var stringKey = Generate(returnType, Unbounded, net8MemoryCache: true);
+        stringKey.Should().Contain($"_cache.TryGetValue(__key, out object? __boxed) && {condition})");
+        stringKey.Should().Contain(hitReturn);
 
-        generated.Should().Contain($"_cache.TryGetValue(__key, out object? __boxed) && {condition})");
-        generated.Should().Contain(hitReturn);
+        // net9.0+: the span key lookup, #185, keeps the same concrete type test.
+        var spanKey = Generate(returnType, Unbounded, net8MemoryCache: false);
+        spanKey.Should().Contain($"if (__found && {condition})");
+        spanKey.Should().Contain(hitReturn);
     }
 
     [Theory]
-    [InlineData("ValueTask<int>", Unbounded)]
-    [InlineData("ValueTask<int?>", Unbounded)]
-    [InlineData("ValueTask<Money>", Unbounded)]
-    [InlineData("ValueTask<Money?>", Unbounded)]
-    [InlineData("ValueTask<string?>", Unbounded)]
-    [InlineData("ValueTask<int>", Bounded)]
-    [InlineData("ValueTask<int?>", Bounded)]
-    [InlineData("ValueTask<Money?>", Bounded)]
-    [InlineData("ValueTask<string?>", Bounded)]
-    public void HitPath_NeverCallsTheGenericTryGetValue(string returnType, string attribute)
+    [InlineData("ValueTask<int>", Unbounded, false)]
+    [InlineData("ValueTask<int?>", Unbounded, false)]
+    [InlineData("ValueTask<Money>", Unbounded, false)]
+    [InlineData("ValueTask<Money?>", Unbounded, false)]
+    [InlineData("ValueTask<string?>", Unbounded, false)]
+    [InlineData("ValueTask<int>", Bounded, false)]
+    [InlineData("ValueTask<int?>", Bounded, false)]
+    [InlineData("ValueTask<Money?>", Bounded, false)]
+    [InlineData("ValueTask<string?>", Bounded, false)]
+    [InlineData("ValueTask<int>", Unbounded, true)]
+    [InlineData("ValueTask<int?>", Unbounded, true)]
+    [InlineData("ValueTask<Money?>", Bounded, true)]
+    public void HitPath_NeverCallsTheGenericTryGetValue(string returnType, string attribute, bool net8MemoryCache)
     {
-        var calls = Generate(returnType, attribute)
-            .Split('\n')
-            .Where(l => l.Contains(".TryGetValue(", System.StringComparison.Ordinal))
+        var (compilation, generatedTrees) = TestHelper.Compile(Source(returnType, attribute), net8MemoryCache);
+
+        var calls = generatedTrees
+            .SelectMany(tree => tree.GetRoot().DescendantNodes()
+                .OfType<Microsoft.CodeAnalysis.CSharp.Syntax.InvocationExpressionSyntax>()
+                .Select(call => compilation.GetSemanticModel(tree).GetSymbolInfo(call).Symbol as IMethodSymbol))
+            .Where(method => method is { Name: "TryGetValue" })
             .ToList();
 
-        // Only the non-generic IMemoryCache.TryGetValue(object, out object?) may be called.
-        calls.Should().ContainSingle();
-        calls[0].Should().Contain("TryGetValue(__key, out object? __boxed)");
+        // Only the non-generic TryGetValue(object, out object?) and, on net9.0+, the non-generic
+        // MemoryCache.TryGetValue(ReadOnlySpan<char>, out object?) may be called.
+        calls.Should().NotBeEmpty();
+        calls.Should().AllSatisfy(method =>
+        {
+            method!.IsGenericMethod.Should().BeFalse();
+            method.Parameters[1].Type.SpecialType.Should().Be(SpecialType.System_Object);
+        });
     }
 
     [Theory]
@@ -85,7 +102,13 @@ public class CacheHitShapeTests
     [InlineData("ValueTask<string?>", Bounded)]
     public async Task HitPath_CompilesWithoutErrorsOrGeneratedWarnings(string returnType, string attribute)
     {
-        var diagnostics = await TestHelper.GetDiagnostics(Source(returnType, attribute));
+        foreach (var net8MemoryCache in new[] { false, true })
+            await AssertCompilesCleanly(Source(returnType, attribute), net8MemoryCache);
+    }
+
+    private static async Task AssertCompilesCleanly(string source, bool net8MemoryCache)
+    {
+        var diagnostics = await TestHelper.GetDiagnostics(source, net8MemoryCache: net8MemoryCache).ConfigureAwait(false);
 
         // Errors anywhere, and warnings inside the generated proxy, which consumers build with
         // warnings as errors. The proxy is emitted under #nullable enable.
@@ -103,7 +126,7 @@ public class CacheHitShapeTests
     [Fact]
     public async Task NullableReferenceParameterAndPassthrough_CompileWithoutGeneratedWarnings()
     {
-        var diagnostics = await TestHelper.GetDiagnostics("""
+        const string source = """
             using System.Threading;
             using System.Threading.Tasks;
             using ZeroAlloc.Cache;
@@ -115,14 +138,9 @@ public class CacheHitShapeTests
                 ValueTask<string?> SaveAsync(string? data);
                 string? Describe(object? value);
             }
-            """);
+            """;
 
-        var problems = diagnostics
-            .Where(d => d.Severity == DiagnosticSeverity.Error
-                || (d.Severity == DiagnosticSeverity.Warning
-                    && d.Location.SourceTree?.FilePath.EndsWith(".g.cs", System.StringComparison.Ordinal) == true))
-            .Select(d => d.ToString())
-            .ToList();
-        problems.Should().BeEmpty();
+        foreach (var net8MemoryCache in new[] { false, true })
+            await AssertCompilesCleanly(source, net8MemoryCache);
     }
 }

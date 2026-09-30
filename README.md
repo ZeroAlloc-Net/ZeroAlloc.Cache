@@ -8,7 +8,7 @@
 
 Source-generated zero-allocation caching proxy from an annotated interface.
 
-Add `[Cache]` to an interface and a Roslyn source generator emits a proxy class that transparently intercepts every method call, returning a cached result on hit with **no heap allocation on the cache-hit path**. Backed by `IMemoryCache` by default, with optional `HybridCache` (L1 + L2) opt-in per method. AOT-safe.
+Add `[Cache]` to an interface and a Roslyn source generator emits a proxy class that transparently intercepts every method call, returning a cached result on hit with **no heap allocation on the cache-hit path** for `ValueTask<T>` methods on the default `MemoryCache` on .NET 9 and later. The few cases that still allocate are [listed](https://github.com/ZeroAlloc-Net/ZeroAlloc.Cache/blob/main/docs/performance.md#where-a-hit-still-allocates). Backed by `IMemoryCache` by default, with optional `HybridCache` (L1 + L2) opt-in per method. AOT-safe.
 
 ---
 
@@ -38,7 +38,7 @@ Inject `IProductRepository` anywhere — caching is transparent to the caller.
 public class ProductsController(IProductRepository repo)
 {
     public async Task<Product?> Get(int id, CancellationToken ct)
-        => await repo.GetByIdAsync(id, ct); // cache hit = zero allocation
+        => await repo.GetByIdAsync(id, ct); // the proxy's cache hit allocates nothing
 }
 ```
 
@@ -46,15 +46,15 @@ public class ProductsController(IProductRepository repo)
 
 ## Performance
 
-L1 (in-process) cache-hit comparison. .NET 10.0.7, i9-12900HK, BenchmarkDotNet v0.15.8.
+L1 (in-process) cache-hit comparison. .NET 10.0.12, i9-12900HK, BenchmarkDotNet v0.15.8.
 
 | Library | Time | Allocated |
 |---|---:|---:|
-| Raw `IMemoryCache.GetOrCreateAsync` | 208 ns | 176 B |
-| **ZA.Cache proxy** | **434 ns** | **160 B** |
-| FusionCache | 989 ns | 112 B |
+| Raw `IMemoryCache.GetOrCreateAsync` | 157 ns | 104 B |
+| **ZA.Cache proxy** | **198 ns** | **0 B** |
+| FusionCache | 1,270 ns | 88 B |
 
-ZA.Cache is **2.3× faster than FusionCache** with comparable allocation. The ~2× premium over hand-rolled `IMemoryCache.GetOrCreateAsync` is the cost of the typed `[Cache]` attribute abstraction (generated key building + async wrapper) — in exchange you don't write the lookup boilerplate at every call site. FusionCache's overhead comes from carrying L2-cache and stampede-protection infrastructure even when only L1 is configured.
+ZA.Cache is **about 6× faster than FusionCache and allocates nothing on the hit**. The ~1.3× premium over hand-rolled `IMemoryCache.GetOrCreateAsync` is the cost of the typed `[Cache]` attribute abstraction (proxy dispatch, key formatting, telemetry) — in exchange you don't write the lookup boilerplate at every call site. FusionCache's overhead comes from carrying L2-cache and stampede-protection infrastructure even when only L1 is configured.
 
 Full methodology + design analysis: [docs/performance.md](https://github.com/ZeroAlloc-Net/ZeroAlloc.Cache/blob/main/docs/performance.md).
 
@@ -62,12 +62,12 @@ Full methodology + design analysis: [docs/performance.md](https://github.com/Zer
 
 | Feature | Notes |
 |---------|-------|
-| Zero allocation on cache hit | Key is built at compile time; no boxing, no string interpolation at runtime |
+| Zero allocation on cache hit | On .NET 9+ with `MemoryCache`, a hit formats the key into a stack buffer and looks it up as a span, so a `ValueTask<T>` hit allocates nothing. [Where a hit still allocates](https://github.com/ZeroAlloc-Net/ZeroAlloc.Cache/blob/main/docs/performance.md#where-a-hit-still-allocates) |
 | `IMemoryCache` (default) | In-process L1 cache; no extra dependencies |
 | `HybridCache` (opt-in) | L1 + L2 distributed cache via `Microsoft.Extensions.Caching.Hybrid` |
 | Method-level override | Any `[Cache]` on a method shadows the interface-level config for that method |
 | `MaxEntries` | Moves the method to an isolated `MemoryCache` with a `SizeLimit`, shared by all bounded methods of the interface for the lifetime of the container |
-| Compile-time key | Cache key expression is emitted by the generator — zero key-building overhead on hit |
+| Compile-time key | The key expression is emitted by the generator. The key text is `Interface.Method:arg1:arg2`, the same on every path, so an entry can be read or removed by it, see [Cache keys](#cache-keys) |
 | AOT / trimmer safe | Generated proxy is concrete; no reflection at runtime |
 | DI integration | Generated `Add{Service}Cache<TImpl>()` extension registers everything, e.g. `AddProductRepositoryCache` for `IProductRepository` |
 
@@ -78,7 +78,17 @@ Full methodology + design analysis: [docs/performance.md](https://github.com/Zer
 | Scenario | Behavior |
 |----------|----------|
 | **Miss** | Inner implementation is called; result is stored in cache with the configured TTL; result is returned |
-| **Hit** | Cached value is returned directly; inner implementation is never invoked; no heap allocation |
+| **Hit** | Cached value is returned directly; inner implementation is never invoked; no heap allocation, [with exceptions](https://github.com/ZeroAlloc-Net/ZeroAlloc.Cache/blob/main/docs/performance.md#where-a-hit-still-allocates) |
+
+### Cache keys
+
+Each entry is stored under the string `{Interface}.{Method}:{arg1}:{arg2}`, built from every parameter except the `CancellationToken`, each formatted with the current culture. A method without key parameters uses `{Interface}.{Method}`. To evict an entry from the shared `IMemoryCache`, remove it by that string:
+
+```csharp
+cache.Remove($"IProductRepository.GetByIdAsync:{id}");
+```
+
+`HybridCache` methods use the same key text.
 
 ---
 

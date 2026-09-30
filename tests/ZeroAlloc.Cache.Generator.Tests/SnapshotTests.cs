@@ -21,6 +21,28 @@ public sealed class SnapshotTests
         TestHelper.Verify(source);
     }
 
+    // A net8.0 consumer has no MemoryCache.TryGetValue(ReadOnlySpan<char>, ...), so the proxy keeps
+    // the string key lookup, and one shared and one bounded method pin its full shape. #185
+    [Fact]
+    public void Net8MemoryCache_KeepsStringKeyLookup()
+    {
+        var source = """
+            using ZeroAlloc.Cache;
+            using System.Threading;
+            using System.Threading.Tasks;
+            namespace T;
+            public interface IMyService
+            {
+                [Cache(TtlMs = 30_000)]
+                ValueTask<string> GetAsync(string id, CancellationToken ct);
+
+                [Cache(TtlMs = 30_000, MaxEntries = 100)]
+                ValueTask<int> CountAsync(int id, CancellationToken ct);
+            }
+            """;
+        TestHelper.Verify(source, net8MemoryCache: true);
+    }
+
     [Fact]
     public void InterfaceLevel_WithPassthrough_GeneratesProxy()
     {

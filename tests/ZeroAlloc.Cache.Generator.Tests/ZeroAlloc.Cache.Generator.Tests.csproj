@@ -11,12 +11,23 @@
     <PackageReference Include="AwesomeAssertions" Version="9.6.0" />
     <PackageReference Include="Microsoft.CodeAnalysis.CSharp" Version="5.9.0" />
     <PackageReference Include="Microsoft.Extensions.Caching.Hybrid" Version="10.10.0" />
+    <PackageReference Include="Microsoft.Extensions.Caching.Memory" Version="10.0.12" GeneratePathProperty="true" />
     <ProjectReference Include="..\..\src\ZeroAlloc.Cache\ZeroAlloc.Cache.csproj" />
     <ProjectReference Include="..\..\src\ZeroAlloc.Cache.Generator\ZeroAlloc.Cache.Generator.csproj" />
   </ItemGroup>
   <ItemGroup>
     <Using Include="Xunit" />
     <Using Include="AwesomeAssertions" />
+  </ItemGroup>
+
+  <!-- The net8.0 build of Microsoft.Extensions.Caching.Memory, which a net8.0 consumer of
+       ZeroAlloc.Cache compiles against. It lacks MemoryCache.TryGetValue(ReadOnlySpan<char>, ...),
+       so tests that reference it pin the string key lookup the generator falls back to. #185 -->
+  <ItemGroup>
+    <None Include="$(PkgMicrosoft_Extensions_Caching_Memory)\lib\net8.0\Microsoft.Extensions.Caching.Memory.dll"
+          Link="net8.0-memory-cache\Microsoft.Extensions.Caching.Memory.dll"
+          CopyToOutputDirectory="PreserveNewest"
+          Visible="false" />
   </ItemGroup>
 
   <!-- Snapshots are data, not code. Verify's targets excluded them from compilation; without
