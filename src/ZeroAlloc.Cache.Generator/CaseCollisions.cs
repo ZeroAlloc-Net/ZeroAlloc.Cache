@@ -52,10 +52,8 @@ internal sealed record CaseCollisions(
 
     private static int CompareDeclarationOrder(CacheModel x, CacheModel y)
     {
-        var byPath = string.CompareOrdinal(x.Location?.Tree.FilePath, y.Location?.Tree.FilePath);
-        if (byPath != 0) return byPath;
-        var byPosition = (x.Location?.Span.Start ?? 0).CompareTo(y.Location?.Span.Start ?? 0);
-        return byPosition != 0 ? byPosition : string.CompareOrdinal(x.HintName, y.HintName);
+        var byLocation = LocationInfo.CompareDeclarationOrder(x.Location, y.Location);
+        return byLocation != 0 ? byLocation : string.CompareOrdinal(x.HintName, y.HintName);
     }
 
     // ImmutableArray compares by reference; the pipeline needs value equality to keep this cached.

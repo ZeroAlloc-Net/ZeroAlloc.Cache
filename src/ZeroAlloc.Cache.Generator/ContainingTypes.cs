@@ -54,7 +54,7 @@ internal static class ContainingTypes
     /// </summary>
     public static DiagnosticInfo? Check(INamedTypeSymbol symbol, CancellationToken ct)
     {
-        var location = LocationInfo.From(symbol);
+        var location = LocationInfo.FirstDeclaration(symbol);
         var name = symbol.ToDisplayString();
 
         if (IsFileLocalOrNestedInOne(symbol))

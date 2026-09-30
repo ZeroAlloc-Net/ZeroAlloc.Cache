@@ -7,7 +7,7 @@ internal sealed record CacheModel(
     string InterfaceFqn,
     string HintName,            // unique within the compilation, see HintNames.ForHost
     string DisplayName,         // as diagnostics name the interface, e.g. "N.Outer.IFoo"
-    LocationInfo? Location,     // the interface's name, where ZC0010 points
+    LocationInfo? Location,     // the interface's name in its first declaration, where ZC0006 to ZC0010 point
     ImmutableArray<string> ContainingDeclarations, // partial headers of the containing types, outermost first
     string NestedTypePrefix,    // "" at the top of a namespace, else e.g. "global::N.Outer." for the proxy and holder
     string KeyName,             // names the interface in cache keys and telemetry, e.g. "Outer.IFoo"

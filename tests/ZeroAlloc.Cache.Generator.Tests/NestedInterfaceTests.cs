@@ -439,6 +439,30 @@ public sealed class NestedInterfaceTests
         run.HintNames.Should().Equal("N.IFoo.Cache.g.cs");
     }
 
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void PartialInterfaceInTwoFiles_IsReportedOnTheEarlierFile_WhateverTheCompilationOrder(bool reversed)
+    {
+        var a = ("A.cs", """
+            namespace N { public partial interface IFoo<T> { System.Threading.Tasks.ValueTask<int> CountAsync(int id); } }
+            """);
+        var b = ("B.cs", """
+            namespace N
+            {
+                [ZeroAlloc.Cache.Cache(TtlMs = 1000)]
+                public partial interface IFoo<T> { System.Threading.Tasks.ValueTask<T> GetAsync(int id); }
+            }
+            """);
+
+        var run = reversed ? TestHelper.Run(b, a) : TestHelper.Run(a, b);
+
+        run.CompileErrors.Should().BeEmpty();
+        var diagnostic = run.GeneratorDiagnostics.Should().ContainSingle().Which;
+        diagnostic.Id.Should().Be("ZC0007");
+        diagnostic.Location.GetLineSpan().Path.Should().Be("A.cs");
+    }
+
     private static void AssertOnName(Diagnostic diagnostic, string source, string name)
     {
         diagnostic.Location.IsInSource.Should().BeTrue();

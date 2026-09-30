@@ -149,7 +149,7 @@ public sealed class CacheGenerator : IIncrementalGenerator
             ifaceFqn,
             HintNames.ForHost(symbol),
             symbol.ToDisplayString(),
-            LocationInfo.From(symbol),
+            LocationInfo.FirstDeclaration(symbol),
             ContainingTypes.Headers(containers),
             containers.Count == 0
                 ? string.Empty
@@ -175,7 +175,7 @@ public sealed class CacheGenerator : IIncrementalGenerator
             string.Empty,
             HintNames.ForHost(symbol),
             symbol.ToDisplayString(),
-            LocationInfo.From(symbol),
+            LocationInfo.FirstDeclaration(symbol),
             System.Collections.Immutable.ImmutableArray<string>.Empty,
             string.Empty,
             string.Empty,
