@@ -58,7 +58,7 @@ public class ProductsController(IProductRepository repo)
 }
 ```
 
-On a cache miss the inner `ProductRepositoryImpl` is called and the result is stored. On a cache hit the value is returned directly — no allocation, no inner call.
+On a cache miss the inner `ProductRepositoryImpl` is called and the result is stored. On a cache hit the value is returned directly, without calling the inner implementation. For a `ValueTask<T>` method on the default `MemoryCache` on .NET 9 and later, the hit allocates nothing; [Performance](performance.md#where-a-hit-still-allocates) lists the cases that still allocate.
 
 ---
 

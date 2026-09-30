@@ -3,7 +3,6 @@
 #nullable enable
 
 using Microsoft.Extensions.Caching.Memory;
-using Microsoft.Extensions.Caching.Hybrid;
 using Microsoft.Extensions.DependencyInjection;
 
 using System.Diagnostics;
@@ -25,24 +24,19 @@ internal sealed class IMyServiceCacheProxy : global::T.IMyService
         _meter.CreateCounter<long>("cache.misses");
     private static readonly global::System.Diagnostics.Metrics.Counter<long> _evictions =
         _meter.CreateCounter<long>("cache.evictions");
-    private static readonly global::System.Diagnostics.Metrics.Counter<long> _hybridCalls =
-        _meter.CreateCounter<long>("cache.hybrid_calls");
 
     private readonly global::T.IMyService _inner;
+    private readonly global::Microsoft.Extensions.Caching.Memory.IMemoryCache _cache;
     private readonly global::Microsoft.Extensions.Caching.Memory.MemoryCache _boundedCache;
-    private readonly global::Microsoft.Extensions.Caching.Hybrid.HybridCache _hybridCache;
-
-    private static readonly global::Microsoft.Extensions.Caching.Hybrid.HybridCacheEntryOptions _findAsyncOptions =
-        new() { Expiration = global::System.TimeSpan.FromMilliseconds(10000) };
 
     public IMyServiceCacheProxy(
         global::T.IMyService inner,
-        IMyServiceBoundedCache boundedCache,
-        global::Microsoft.Extensions.Caching.Hybrid.HybridCache hybridCache)
+        global::Microsoft.Extensions.Caching.Memory.IMemoryCache cache,
+        IMyServiceBoundedCache boundedCache)
     {
         _inner = inner;
+        _cache = cache;
         _boundedCache = boundedCache.Cache;
-        _hybridCache = hybridCache;
     }
 
     public async global::System.Threading.Tasks.ValueTask<string> GetAsync(string id, global::System.Threading.CancellationToken ct)
@@ -50,9 +44,8 @@ internal sealed class IMyServiceCacheProxy : global::T.IMyService
         using var __activity = _activitySource.StartActivity("cache.lookup");
         __activity?.SetTag("cache.method", "IMyService.GetAsync");
         var __sw = global::System.Diagnostics.Stopwatch.GetTimestamp();
-        object? __boxed;
-        bool __found = __TryGetBySpanKey(_boundedCache, id, out __boxed);
-        if (__found && __boxed is null or string)
+        var __key = $"IMyService.GetAsync:{id}";
+        if (_cache.TryGetValue(__key, out object? __boxed) && __boxed is null or string)
         {
             _hits.Add(1, new global::System.Collections.Generic.KeyValuePair<string, object?>("method", "GetAsync"));
             __activity?.SetTag("cache.tier", "L1");
@@ -63,9 +56,8 @@ internal sealed class IMyServiceCacheProxy : global::T.IMyService
         }
         _misses.Add(1, new global::System.Collections.Generic.KeyValuePair<string, object?>("method", "GetAsync"));
         var __result = await _inner.GetAsync(id, ct).ConfigureAwait(false);
-        var __key = $"IMyService.GetAsync:{id}";
-        _boundedCache.Set(__key, __result, new global::Microsoft.Extensions.Caching.Memory.MemoryCacheEntryOptions
-            { AbsoluteExpirationRelativeToNow = global::System.TimeSpan.FromMilliseconds(30000), Size = 1 }
+        _cache.Set(__key, __result, new global::Microsoft.Extensions.Caching.Memory.MemoryCacheEntryOptions
+            { AbsoluteExpirationRelativeToNow = global::System.TimeSpan.FromMilliseconds(30000) }
             .RegisterPostEvictionCallback(static (_, _, _, _) =>
                 _evictions.Add(1, new global::System.Collections.Generic.KeyValuePair<string, object?>("method", "GetAsync"))));
         __activity?.SetTag("cache.tier", "L1");
@@ -73,36 +65,34 @@ internal sealed class IMyServiceCacheProxy : global::T.IMyService
         _lookupDurationMs.Record(global::System.Diagnostics.Stopwatch.GetElapsedTime(__sw).TotalMilliseconds,
             new global::System.Collections.Generic.KeyValuePair<string, object?>("cache.method", "IMyService.GetAsync"));
         return __result;
-
-        static bool __TryGetBySpanKey(global::Microsoft.Extensions.Caching.Memory.MemoryCache __cache, string id, out object? __value)
-        {
-            global::System.Span<char> __buffer = stackalloc char[256];
-            return global::System.MemoryExtensions.TryWrite(__buffer, $"IMyService.GetAsync:{id}", out int __length)
-                ? __cache.TryGetValue((global::System.ReadOnlySpan<char>)__buffer.Slice(0, __length), out __value)
-                : __cache.TryGetValue((object)$"IMyService.GetAsync:{id}", out __value);
-        }
     }
 
-    public async global::System.Threading.Tasks.ValueTask<string> FindAsync(string query, global::System.Threading.CancellationToken ct)
+    public async global::System.Threading.Tasks.ValueTask<int> CountAsync(int id, global::System.Threading.CancellationToken ct)
     {
         using var __activity = _activitySource.StartActivity("cache.lookup");
-        __activity?.SetTag("cache.method", "IMyService.FindAsync");
-        __activity?.SetTag("cache.tier", "L2");
+        __activity?.SetTag("cache.method", "IMyService.CountAsync");
         var __sw = global::System.Diagnostics.Stopwatch.GetTimestamp();
-        try
+        var __key = $"IMyService.CountAsync:{id}";
+        if (_boundedCache.TryGetValue((object)__key, out object? __boxed) && __boxed is int __cached)
         {
-            return await _hybridCache.GetOrCreateAsync(
-                $"IMyService.FindAsync:{query}",
-                (inner: _inner, query: query),
-                static async (s, ct) => { _hybridCalls.Add(1, new global::System.Collections.Generic.KeyValuePair<string, object?>("method", "FindAsync")); return await s.inner.FindAsync(s.query, ct).ConfigureAwait(false); },
-                _findAsyncOptions,
-                cancellationToken: ct).ConfigureAwait(false);
-        }
-        finally
-        {
+            _hits.Add(1, new global::System.Collections.Generic.KeyValuePair<string, object?>("method", "CountAsync"));
+            __activity?.SetTag("cache.tier", "L1");
+            __activity?.SetTag("cache.hit", true);
             _lookupDurationMs.Record(global::System.Diagnostics.Stopwatch.GetElapsedTime(__sw).TotalMilliseconds,
-                new global::System.Collections.Generic.KeyValuePair<string, object?>("cache.method", "IMyService.FindAsync"));
+                new global::System.Collections.Generic.KeyValuePair<string, object?>("cache.method", "IMyService.CountAsync"));
+            return __cached;
         }
+        _misses.Add(1, new global::System.Collections.Generic.KeyValuePair<string, object?>("method", "CountAsync"));
+        var __result = await _inner.CountAsync(id, ct).ConfigureAwait(false);
+        _boundedCache.Set(__key, __result, new global::Microsoft.Extensions.Caching.Memory.MemoryCacheEntryOptions
+            { AbsoluteExpirationRelativeToNow = global::System.TimeSpan.FromMilliseconds(30000), Size = 1 }
+            .RegisterPostEvictionCallback(static (_, _, _, _) =>
+                _evictions.Add(1, new global::System.Collections.Generic.KeyValuePair<string, object?>("method", "CountAsync"))));
+        __activity?.SetTag("cache.tier", "L1");
+        __activity?.SetTag("cache.hit", false);
+        _lookupDurationMs.Record(global::System.Diagnostics.Stopwatch.GetElapsedTime(__sw).TotalMilliseconds,
+            new global::System.Collections.Generic.KeyValuePair<string, object?>("cache.method", "IMyService.CountAsync"));
+        return __result;
     }
 
 }
@@ -110,7 +100,7 @@ internal sealed class IMyServiceCacheProxy : global::T.IMyService
 internal sealed class IMyServiceBoundedCache : global::System.IDisposable
 {
     public global::Microsoft.Extensions.Caching.Memory.MemoryCache Cache { get; } =
-        new(new global::Microsoft.Extensions.Caching.Memory.MemoryCacheOptions { SizeLimit = 500 });
+        new(new global::Microsoft.Extensions.Caching.Memory.MemoryCacheOptions { SizeLimit = 100 });
 
     public void Dispose() => Cache.Dispose();
 }
@@ -124,15 +114,15 @@ public static partial class CacheServiceCollectionExtensions
         this global::Microsoft.Extensions.DependencyInjection.IServiceCollection services)
         where TImpl : class, global::T.IMyService
     {
+        services.AddMemoryCache();
         global::Microsoft.Extensions.DependencyInjection.Extensions.ServiceCollectionDescriptorExtensions
             .TryAddSingleton<IMyServiceBoundedCache>(services, static _ => new IMyServiceBoundedCache());
-        services.AddHybridCache();
         services.AddTransient<TImpl>();
         services.AddTransient<global::T.IMyService>(sp =>
             new IMyServiceCacheProxy(
                 sp.GetRequiredService<TImpl>(),
-                sp.GetRequiredService<IMyServiceBoundedCache>(),
-                sp.GetRequiredService<global::Microsoft.Extensions.Caching.Hybrid.HybridCache>()));
+                sp.GetRequiredService<global::Microsoft.Extensions.Caching.Memory.IMemoryCache>(),
+                sp.GetRequiredService<IMyServiceBoundedCache>()));
         return services;
     }
 }

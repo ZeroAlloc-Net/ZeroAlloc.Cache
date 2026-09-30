@@ -10,11 +10,34 @@ internal sealed record CacheModel(
     bool AnyMethodUsesIMemoryCache,
     bool AnyMethodUsesIsolatedCache,      // MaxEntries > 0 on any non-hybrid method
     int IsolatedCacheMaxEntries,          // SizeLimit for the isolated MemoryCache (first MaxEntries > 0)
+    bool SpanKeyLookupAvailable,          // MemoryCache.TryGetValue(ReadOnlySpan<char>, out object?) is usable, #185
     ImmutableArray<CachedMethodModel> CachedMethods,
     ImmutableArray<PassthroughMethodModel> PassthroughMethods,
     ImmutableArray<DiagnosticInfo> Diagnostics
 )
 {
+    /// <summary>
+    /// The method's hit path looks the key up as a span instead of a string. Only a method with
+    /// key parameters needs it: without any, the key is a constant string and costs nothing.
+    /// HybridCache takes string keys only, so hybrid methods never use it.
+    /// </summary>
+    public bool UsesSpanKeyLookup(CachedMethodModel m) =>
+        SpanKeyLookupAvailable && !m.EffectiveConfig.UseHybridCache && !m.KeyParams.IsEmpty;
+
+    /// <summary>A method on the shared IMemoryCache uses the span lookup, so the proxy needs the MemoryCache field.</summary>
+    public bool NeedsSharedMemoryCacheField
+    {
+        get
+        {
+            foreach (var m in CachedMethods)
+            {
+                if (UsesSpanKeyLookup(m) && !m.UsesBoundedCache)
+                    return true;
+            }
+            return false;
+        }
+    }
+
     // Override synthesized record equality for ImmutableArray fields
     public bool Equals(CacheModel? other)
     {
@@ -28,6 +51,7 @@ internal sealed record CacheModel(
             && AnyMethodUsesIMemoryCache == other.AnyMethodUsesIMemoryCache
             && AnyMethodUsesIsolatedCache == other.AnyMethodUsesIsolatedCache
             && IsolatedCacheMaxEntries == other.IsolatedCacheMaxEntries
+            && SpanKeyLookupAvailable == other.SpanKeyLookupAvailable
             && ArraysEqual(CachedMethods, other.CachedMethods)
             && ArraysEqual(PassthroughMethods, other.PassthroughMethods)
             && ArraysEqual(Diagnostics, other.Diagnostics);

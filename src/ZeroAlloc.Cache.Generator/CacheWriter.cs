@@ -112,6 +112,11 @@ internal static class CacheWriter
         if (model.AnyMethodUsesIMemoryCache)
             sb.AppendLine("    private readonly global::Microsoft.Extensions.Caching.Memory.IMemoryCache _cache;");
 
+        // The shared cache as a MemoryCache when it is exactly that type, for the span key lookup.
+        // Null for any other IMemoryCache, which keeps the string key lookup. See #185.
+        if (model.NeedsSharedMemoryCacheField)
+            sb.AppendLine("    private readonly global::Microsoft.Extensions.Caching.Memory.MemoryCache? _memoryCache;");
+
         // The bounded cache is owned by a DI singleton, not by the proxy: the proxy is transient,
         // so a per-instance cache started empty on every resolution. See #180.
         if (model.AnyMethodUsesIsolatedCache)
@@ -185,6 +190,14 @@ internal static class CacheWriter
         sb.AppendLine("        _inner = inner;");
         if (model.AnyMethodUsesIMemoryCache)
             sb.AppendLine("        _cache = cache;");
+        // Exact type, not 'as': a subclass or decorator may re-implement IMemoryCache, and the
+        // span lookup would bypass it.
+        if (model.NeedsSharedMemoryCacheField)
+        {
+            sb.AppendLine("        _memoryCache = cache.GetType() == typeof(global::Microsoft.Extensions.Caching.Memory.MemoryCache)");
+            sb.AppendLine("            ? (global::Microsoft.Extensions.Caching.Memory.MemoryCache)cache");
+            sb.AppendLine("            : null;");
+        }
         if (model.AnyMethodUsesIsolatedCache)
             sb.AppendLine("        _boundedCache = boundedCache.Cache;");
         if (model.AnyMethodUsesHybridCache)
@@ -225,7 +238,7 @@ internal static class CacheWriter
             if (m.EffectiveConfig.UseHybridCache)
                 WriteHybridCachedMethod(sb, model.InterfaceName, m);
             else
-                WriteCachedMethod(sb, model.InterfaceName, m);
+                WriteCachedMethod(sb, model.InterfaceName, m, model.UsesSpanKeyLookup(m));
         }
 
         // Passthrough methods
@@ -235,18 +248,20 @@ internal static class CacheWriter
         sb.AppendLine("}");
     }
 
-    private static void WriteCachedMethod(StringBuilder sb, string interfaceName, CachedMethodModel m)
+    private static void WriteCachedMethod(StringBuilder sb, string interfaceName, CachedMethodModel m, bool spanKeyLookup)
     {
         var cacheMethodTag = $"{interfaceName}.{m.Name}";
+        // The key text. Every lookup and store uses exactly this text, so an entry stays readable
+        // and removable by the same string key, whichever lookup path found it.
+        var keyText = $"$\"{interfaceName}.{m.Name}{m.KeyArguments}\"";
         sb.AppendLine($"    public async {m.ReturnTypeFqn} {m.Name}({m.ParameterList})");
         sb.AppendLine("    {");
         sb.AppendLine($"        using var __activity = _activitySource.StartActivity(\"cache.lookup\");");
         sb.AppendLine($"        __activity?.SetTag(\"cache.method\", \"{cacheMethodTag}\");");
         sb.AppendLine($"        var __sw = global::System.Diagnostics.Stopwatch.GetTimestamp();");
-        sb.AppendLine($"        var __key = $\"{interfaceName}.{m.Name}{m.KeyArguments}\";");
         var cacheField = UsesBoundedCache(m) ? "_boundedCache" : "_cache";
         var (hitCondition, hitReturn) = BuildCacheHit(m);
-        sb.AppendLine($"        if ({cacheField}.TryGetValue(__key, out object? __boxed) && {hitCondition})");
+        WriteCacheLookup(sb, m, spanKeyLookup, keyText, cacheField, hitCondition);
         sb.AppendLine("        {");
         sb.AppendLine($"            _hits.Add(1, new global::System.Collections.Generic.KeyValuePair<string, object?>(\"method\", \"{m.Name}\"));");
         sb.AppendLine($"            __activity?.SetTag(\"cache.tier\", \"L1\");");
@@ -257,14 +272,85 @@ internal static class CacheWriter
         sb.AppendLine("        }");
         sb.AppendLine($"        _misses.Add(1, new global::System.Collections.Generic.KeyValuePair<string, object?>(\"method\", \"{m.Name}\"));");
         sb.AppendLine($"        var __result = await _inner.{m.Name}({m.ArgumentList}).ConfigureAwait(false);");
+        if (spanKeyLookup)
+            sb.AppendLine($"        var __key = {keyText};");
         WriteCacheSetCall(sb, m, cacheField);
         sb.AppendLine($"        __activity?.SetTag(\"cache.tier\", \"L1\");");
         sb.AppendLine($"        __activity?.SetTag(\"cache.hit\", false);");
         sb.AppendLine($"        _lookupDurationMs.Record(global::System.Diagnostics.Stopwatch.GetElapsedTime(__sw).TotalMilliseconds,");
         sb.AppendLine($"            new global::System.Collections.Generic.KeyValuePair<string, object?>(\"cache.method\", \"{cacheMethodTag}\"));");
         sb.AppendLine("        return __result;");
+        if (spanKeyLookup)
+            WriteSpanKeyLookup(sb, m, keyText);
         sb.AppendLine("    }");
         sb.AppendLine();
+    }
+
+    // Emits the lookup and the opening 'if' of the hit branch.
+    private static void WriteCacheLookup(
+        StringBuilder sb, CachedMethodModel m, bool spanKeyLookup, string keyText, string cacheField, string hitCondition)
+    {
+        if (!spanKeyLookup)
+        {
+            sb.AppendLine($"        var __key = {keyText};");
+            // The bounded cache is typed MemoryCache, which on 9.0+ also has TryGetValue(ReadOnlySpan<char>, ...).
+            // A string converts to both parameter types, and C# 10 to 12 report the call as ambiguous
+            // (CS0121), so the string key goes in as object. IMemoryCache has only the object overload.
+            var keyArgument = UsesBoundedCache(m) ? "(object)__key" : "__key";
+            sb.AppendLine($"        if ({cacheField}.TryGetValue({keyArgument}, out object? __boxed) && {hitCondition})");
+            return;
+        }
+
+        // The key string is built only on a miss; a hit formats the key into a stack buffer.
+        sb.AppendLine("        object? __boxed;");
+        if (UsesBoundedCache(m))
+        {
+            sb.AppendLine($"        bool __found = __TryGetBySpanKey(_boundedCache, {KeyArgumentList(m)}, out __boxed);");
+        }
+        else
+        {
+            sb.AppendLine("        bool __found = _memoryCache is not null");
+            sb.AppendLine($"            ? __TryGetBySpanKey(_memoryCache, {KeyArgumentList(m)}, out __boxed)");
+            sb.AppendLine($"            : _cache.TryGetValue({keyText}, out __boxed);");
+        }
+        sb.AppendLine($"        if (__found && {hitCondition})");
+    }
+
+    private static string KeyArgumentList(CachedMethodModel m)
+    {
+        var args = new StringBuilder();
+        foreach (var kp in m.KeyParams)
+        {
+            if (args.Length > 0) args.Append(", ");
+            args.Append(kp.Name);
+        }
+        return args.ToString();
+    }
+
+    private const int SpanKeyBufferLength = 256;
+
+    // A static local function, because an async method cannot declare a Span<char> local.
+    // MemoryExtensions.TryWrite formats the same interpolation as the string key, with the same
+    // culture and the same ToString calls, into a stack buffer. The non-generic
+    // MemoryCache.TryGetValue(ReadOnlySpan<char>, out object?) then finds the entry stored under
+    // the equal string without allocating one. A key longer than the buffer falls back to the
+    // string. The generic TryGetValue<TItem> overload stays off limits, see #182. See #185.
+    private static void WriteSpanKeyLookup(StringBuilder sb, CachedMethodModel m, string keyText)
+    {
+        var parameters = new StringBuilder("global::Microsoft.Extensions.Caching.Memory.MemoryCache __cache");
+        foreach (var kp in m.KeyParams)
+            parameters.Append(", ").Append(kp.TypeFqn).Append(' ').Append(kp.Name);
+
+        sb.AppendLine();
+        sb.AppendLine($"        static bool __TryGetBySpanKey({parameters}, out object? __value)");
+        sb.AppendLine("        {");
+        sb.AppendLine($"            global::System.Span<char> __buffer = stackalloc char[{SpanKeyBufferLength}];");
+        sb.AppendLine($"            return global::System.MemoryExtensions.TryWrite(__buffer, {keyText}, out int __length)");
+        sb.AppendLine("                ? __cache.TryGetValue((global::System.ReadOnlySpan<char>)__buffer.Slice(0, __length), out __value)");
+        // (object): with C# 10 to 12 an interpolated string converts to ReadOnlySpan<char> as well,
+        // and the call is ambiguous (CS0121).
+        sb.AppendLine($"                : __cache.TryGetValue((object){keyText}, out __value);");
+        sb.AppendLine("        }");
     }
 
     // The hit path reads the entry as object and tests it against the concrete return type.

@@ -117,6 +117,7 @@ public sealed class CacheGenerator : IIncrementalGenerator
             cachedMethods.Exists(static m => !m.EffectiveConfig.UseHybridCache && m.EffectiveConfig.MaxEntries == 0),
             cachedMethods.Exists(static m => m.UsesBoundedCache),
             isolatedCacheMaxEntries,
+            IsSpanKeyLookupAvailable(ctx.SemanticModel.Compilation, ctx.Node.SyntaxTree.Options),
             System.Collections.Immutable.ImmutableArray.CreateRange(cachedMethods),
             System.Collections.Immutable.ImmutableArray.CreateRange(passthroughMethods),
             System.Collections.Immutable.ImmutableArray.CreateRange(diagnostics)
@@ -249,7 +250,7 @@ public sealed class CacheGenerator : IIncrementalGenerator
 
                 bool isRef = param.Type.IsReferenceType
                     && param.Type.SpecialType == Microsoft.CodeAnalysis.SpecialType.None;
-                keyParams.Add(new KeyParam(param.Name, isRef));
+                keyParams.Add(new KeyParam(param.Name, isRef, fqn));
             }
         }
 
@@ -434,6 +435,40 @@ public sealed class CacheGenerator : IIncrementalGenerator
         diagnostics.Add(DiagnosticInfo.Create(
             CacheDiagnostics.HybridCacheNotAvailable,
             LocationInfo.From(symbol)));
+    }
+
+    /// <summary>
+    /// True when the generated hit path can look the key up without building a string: the
+    /// referenced MemoryCache has the non-generic <c>TryGetValue(ReadOnlySpan&lt;char&gt;, out object?)</c>,
+    /// Microsoft.Extensions.Caching.Memory 9.0+ on net9.0+, and the key can be formatted into a
+    /// span with <c>MemoryExtensions.TryWrite</c>, which needs C# 10 interpolated string handlers.
+    /// A net8.0 or netstandard2.0 consumer gets neither and keeps the string key lookup. See #185.
+    /// </summary>
+    private static bool IsSpanKeyLookupAvailable(Compilation compilation, ParseOptions options)
+    {
+        if (options is not Microsoft.CodeAnalysis.CSharp.CSharpParseOptions { LanguageVersion: >= Microsoft.CodeAnalysis.CSharp.LanguageVersion.CSharp10 })
+            return false;
+
+        if (compilation.GetTypeByMetadataName("System.MemoryExtensions+TryWriteInterpolatedStringHandler") is null)
+            return false;
+
+        var memoryCache = compilation.GetTypeByMetadataName("Microsoft.Extensions.Caching.Memory.MemoryCache");
+        if (memoryCache is null)
+            return false;
+
+        foreach (var member in memoryCache.GetMembers("TryGetValue"))
+        {
+            if (member is IMethodSymbol { DeclaredAccessibility: Accessibility.Public, IsStatic: false, IsGenericMethod: false, Parameters.Length: 2 } method
+                && method.Parameters[0].Type is INamedTypeSymbol { IsGenericType: true, TypeArguments.Length: 1 } span
+                && string.Equals(span.OriginalDefinition.ToDisplayString(), "System.ReadOnlySpan<T>", System.StringComparison.Ordinal)
+                && span.TypeArguments[0].SpecialType == SpecialType.System_Char
+                && method.Parameters[1].RefKind == RefKind.Out
+                && method.Parameters[1].Type.SpecialType == SpecialType.System_Object)
+            {
+                return true;
+            }
+        }
+        return false;
     }
 
     private static AttributeData? FindCacheAttr(ISymbol symbol)

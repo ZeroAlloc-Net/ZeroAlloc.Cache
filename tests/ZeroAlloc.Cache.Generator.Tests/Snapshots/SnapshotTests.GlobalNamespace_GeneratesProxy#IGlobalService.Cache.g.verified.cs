@@ -25,6 +25,7 @@ internal sealed class IGlobalServiceCacheProxy : global::IGlobalService
 
     private readonly global::IGlobalService _inner;
     private readonly global::Microsoft.Extensions.Caching.Memory.IMemoryCache _cache;
+    private readonly global::Microsoft.Extensions.Caching.Memory.MemoryCache? _memoryCache;
 
     public IGlobalServiceCacheProxy(
         global::IGlobalService inner,
@@ -32,6 +33,9 @@ internal sealed class IGlobalServiceCacheProxy : global::IGlobalService
     {
         _inner = inner;
         _cache = cache;
+        _memoryCache = cache.GetType() == typeof(global::Microsoft.Extensions.Caching.Memory.MemoryCache)
+            ? (global::Microsoft.Extensions.Caching.Memory.MemoryCache)cache
+            : null;
     }
 
     public async global::System.Threading.Tasks.ValueTask<string> GetAsync(int id, global::System.Threading.CancellationToken ct)
@@ -39,8 +43,11 @@ internal sealed class IGlobalServiceCacheProxy : global::IGlobalService
         using var __activity = _activitySource.StartActivity("cache.lookup");
         __activity?.SetTag("cache.method", "IGlobalService.GetAsync");
         var __sw = global::System.Diagnostics.Stopwatch.GetTimestamp();
-        var __key = $"IGlobalService.GetAsync:{id}";
-        if (_cache.TryGetValue(__key, out object? __boxed) && __boxed is null or string)
+        object? __boxed;
+        bool __found = _memoryCache is not null
+            ? __TryGetBySpanKey(_memoryCache, id, out __boxed)
+            : _cache.TryGetValue($"IGlobalService.GetAsync:{id}", out __boxed);
+        if (__found && __boxed is null or string)
         {
             _hits.Add(1, new global::System.Collections.Generic.KeyValuePair<string, object?>("method", "GetAsync"));
             __activity?.SetTag("cache.tier", "L1");
@@ -51,6 +58,7 @@ internal sealed class IGlobalServiceCacheProxy : global::IGlobalService
         }
         _misses.Add(1, new global::System.Collections.Generic.KeyValuePair<string, object?>("method", "GetAsync"));
         var __result = await _inner.GetAsync(id, ct).ConfigureAwait(false);
+        var __key = $"IGlobalService.GetAsync:{id}";
         _cache.Set(__key, __result, new global::Microsoft.Extensions.Caching.Memory.MemoryCacheEntryOptions
             { AbsoluteExpirationRelativeToNow = global::System.TimeSpan.FromMilliseconds(5000) }
             .RegisterPostEvictionCallback(static (_, _, _, _) =>
@@ -60,6 +68,14 @@ internal sealed class IGlobalServiceCacheProxy : global::IGlobalService
         _lookupDurationMs.Record(global::System.Diagnostics.Stopwatch.GetElapsedTime(__sw).TotalMilliseconds,
             new global::System.Collections.Generic.KeyValuePair<string, object?>("cache.method", "IGlobalService.GetAsync"));
         return __result;
+
+        static bool __TryGetBySpanKey(global::Microsoft.Extensions.Caching.Memory.MemoryCache __cache, int id, out object? __value)
+        {
+            global::System.Span<char> __buffer = stackalloc char[256];
+            return global::System.MemoryExtensions.TryWrite(__buffer, $"IGlobalService.GetAsync:{id}", out int __length)
+                ? __cache.TryGetValue((global::System.ReadOnlySpan<char>)__buffer.Slice(0, __length), out __value)
+                : __cache.TryGetValue((object)$"IGlobalService.GetAsync:{id}", out __value);
+        }
     }
 
 }

@@ -21,6 +21,9 @@ namespace ZeroAlloc.Cache.Benchmarks;
 // are not exercised here; this is the L1-only fair comparison. The
 // FusionCache row includes overhead from those features being available
 // even if unused, which is the realistic production cost.
+//
+// Each row returns the library's own task type directly. An async wrapper
+// method would add its own Task<T> to every row and blur the comparison.
 [MemoryDiagnoser]
 [SimpleJob]
 public class CacheLibrariesBenchmark
@@ -69,27 +72,26 @@ public class CacheLibrariesBenchmark
 
     [Benchmark(Baseline = true, Description = "Raw IMemoryCache: cache hit")]
     [BenchmarkCategory("Hit")]
-    public async Task<string?> Raw_MemoryCache_Hit()
-        => await _msCache.GetOrCreateAsync(("customer", 42), e =>
+    public Task<string?> Raw_MemoryCache_Hit()
+        => _msCache.GetOrCreateAsync(("customer", 42), e =>
         {
             // Factory only runs on miss; we warmed in Setup so this is dead code.
             return Task.FromResult($"customer-42");
-        }).ConfigureAwait(false);
+        });
 
     // --- FusionCache GetOrSetAsync (cache hit) ---
 
     [Benchmark(Description = "FusionCache: cache hit")]
     [BenchmarkCategory("Hit")]
-    public async Task<string> Fusion_Hit()
-        => await _fusion.GetOrSetAsync<string>(
+    public ValueTask<string> Fusion_Hit()
+        => _fusion.GetOrSetAsync<string>(
             "customer-42",
-            (_, _) => Task.FromResult("customer-42"))
-            .ConfigureAwait(false);
+            (_, _) => Task.FromResult("customer-42"));
 
     // --- ZA proxy (cache hit) ---
 
     [Benchmark(Description = "ZA.Cache proxy: cache hit")]
     [BenchmarkCategory("Hit")]
-    public async Task<string> Za_Hit()
-        => await _zaProxy.GetNameAsync(42, CancellationToken.None).ConfigureAwait(false);
+    public ValueTask<string> Za_Hit()
+        => _zaProxy.GetNameAsync(42, CancellationToken.None);
 }
