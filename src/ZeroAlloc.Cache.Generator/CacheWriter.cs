@@ -516,7 +516,12 @@ internal static class CacheWriter
         // accessible interface. Match the interface's accessibility instead (#120). The proxy
         // class is already internal, so only this pair needs adjusting.
         var access = model.IsPubliclyAccessible ? "public" : "internal";
-        sb.AppendLine($"{access} static partial class CacheServiceCollectionExtensions");
+        // Every interface of the namespace adds a part of this class. An internal interface's
+        // part carries no accessibility modifier, so the class is public when any part says so
+        // and internal otherwise; "internal" there conflicted with a public part, CS0262. #198
+        sb.AppendLine(model.IsPubliclyAccessible
+            ? "public static partial class CacheServiceCollectionExtensions"
+            : "static partial class CacheServiceCollectionExtensions");
         sb.AppendLine("{");
         sb.AppendLine($"    {access} static global::Microsoft.Extensions.DependencyInjection.IServiceCollection {methodName}<");
         // IL2091: TImpl flows into AddTransient<T> which requires PublicConstructors.

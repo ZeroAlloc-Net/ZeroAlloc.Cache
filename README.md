@@ -88,7 +88,7 @@ Each entry is stored under the string `{Interface}.{Method}:{arg1}:{arg2}`, buil
 cache.Remove($"IProductRepository.GetByIdAsync:{id}");
 ```
 
-`HybridCache` methods use the same key text. For an interface nested in another type, `{Interface}` starts with the containing types, as in `Catalog.IProductLookup.GetByIdAsync:42`.
+`HybridCache` methods use the same key text. For an interface nested in another type, `{Interface}` starts with the containing types, as in `Catalog.IProductLookup.GetByIdAsync:42`. When two interfaces in the project would use the same `{Interface}`, such as `Shipping.IProductLookup` and `Billing.IProductLookup`, both start with their namespace instead, as in `Shipping.IProductLookup.GetByIdAsync:42`, so they never read each other's entries. Every other interface keeps the shorter text.
 
 ---
 

@@ -12,6 +12,8 @@ internal sealed record CacheModel(
     string NestedTypePrefix,    // "" at the top of a namespace, else e.g. "global::N.Outer." for the proxy and holder
     string KeyName,             // names the interface in cache keys and telemetry, e.g. "Outer.IFoo"
     string ExtensionMethodName, // e.g. "AddFooCache", or "AddOuter_FooCache" when nested
+    string QualifiedKeyName,    // KeyName after the namespace, used when another interface shares the key, #199
+    string QualifiedExtensionMethodName, // e.g. "AddN_IFooCache", used when another method shares the name, #199
     bool IsPubliclyAccessible,  // false => emit the proxy and DI extension as internal
     bool AnyMethodUsesHybridCache,
     bool AnyMethodUsesIMemoryCache,
@@ -77,6 +79,8 @@ internal sealed record CacheModel(
             && string.Equals(NestedTypePrefix, other.NestedTypePrefix, System.StringComparison.Ordinal)
             && string.Equals(KeyName, other.KeyName, System.StringComparison.Ordinal)
             && string.Equals(ExtensionMethodName, other.ExtensionMethodName, System.StringComparison.Ordinal)
+            && string.Equals(QualifiedKeyName, other.QualifiedKeyName, System.StringComparison.Ordinal)
+            && string.Equals(QualifiedExtensionMethodName, other.QualifiedExtensionMethodName, System.StringComparison.Ordinal)
             && IsPubliclyAccessible == other.IsPubliclyAccessible
             && AnyMethodUsesHybridCache == other.AnyMethodUsesHybridCache
             && AnyMethodUsesIMemoryCache == other.AnyMethodUsesIMemoryCache
