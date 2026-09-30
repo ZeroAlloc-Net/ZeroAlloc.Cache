@@ -174,4 +174,31 @@ internal static class TestHelper
 
         return System.Threading.Tasks.Task.FromResult<IReadOnlyList<Diagnostic>>(diags);
     }
+
+    /// <summary>
+    /// Runs the generator over <paramref name="sources"/>, named <c>File0.cs</c>, <c>File1.cs</c>
+    /// and so on, and returns its output and the compilation with that output added.
+    /// </summary>
+    public static GeneratorRun Run(params string[] sources) =>
+        Run(sources.Select((source, i) => ($"File{i}.cs", source)).ToArray());
+
+    public static GeneratorRun Run(params (string Path, string Source)[] files)
+    {
+        var compilation = CSharpCompilation.Create(
+            "Tests",
+            files.Select(f => CSharpSyntaxTree.ParseText(f.Source, ParseOptions, f.Path)),
+            BuildReferences(),
+            new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
+
+        var result = CSharpGeneratorDriver.Create(new CacheGenerator())
+            .WithUpdatedParseOptions(ParseOptions)
+            .RunGenerators(compilation)
+            .GetRunResult();
+
+        return new GeneratorRun(
+            result.Results[0].GeneratedSources.ToDictionary(
+                s => s.HintName, s => s.SourceText.ToString(), StringComparer.Ordinal),
+            result.Diagnostics,
+            compilation.AddSyntaxTrees(result.GeneratedTrees));
+    }
 }

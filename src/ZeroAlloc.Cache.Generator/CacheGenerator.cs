@@ -16,6 +16,9 @@ public sealed class CacheGenerator : IIncrementalGenerator
     /// <summary>The tracking name of the step that builds each interface's model.</summary>
     internal const string ModelsTrackingName = "CacheModels";
 
+    /// <summary>The tracking name of the step that finds case-only hint-name collisions.</summary>
+    internal const string CaseCollisionsTrackingName = "CacheCaseCollisions";
+
     public void Initialize(IncrementalGeneratorInitializationContext context)
     {
         var models = context.SyntaxProvider
@@ -26,17 +29,28 @@ public sealed class CacheGenerator : IIncrementalGenerator
             .Select(static (m, _) => m!)
             .WithTrackingName(ModelsTrackingName);
 
-        context.RegisterSourceOutput(models, static (ctx, model) =>
-        {
-            var hasErrors = false;
-            foreach (var d in model.Diagnostics)
-            {
-                ctx.ReportDiagnostic(d.ToDiagnostic());
-                if (d.Descriptor.DefaultSeverity == Microsoft.CodeAnalysis.DiagnosticSeverity.Error)
-                    hasErrors = true;
-            }
+        // Interfaces whose hint names differ only in case from an earlier one's: Roslyn compares
+        // hint names ignoring case, so only the first can be added. See #197.
+        var collisions = models
+            .Collect()
+            .Select(static (all, _) => CaseCollisions.Find(all))
+            .WithTrackingName(CaseCollisionsTrackingName);
 
-            if (!hasErrors && (model.CachedMethods.Length > 0 || model.PassthroughMethods.Length > 0))
+        context.RegisterSourceOutput(collisions, static (ctx, found) =>
+        {
+            foreach (var d in found.Diagnostics)
+                ctx.ReportDiagnostic(d.ToDiagnostic());
+        });
+
+        var skippedHintNames = collisions.Select(static (found, _) => found.SkippedHintNames);
+
+        context.RegisterSourceOutput(models.Combine(skippedHintNames), static (ctx, pair) =>
+        {
+            var (model, skipped) = pair;
+            foreach (var d in model.Diagnostics)
+                ctx.ReportDiagnostic(d.ToDiagnostic());
+
+            if (model.IsGenerated && !skipped.Contains(model.HintName, System.StringComparer.Ordinal))
                 CacheWriter.Write(ctx, model);
         });
     }
@@ -73,6 +87,11 @@ public sealed class CacheGenerator : IIncrementalGenerator
         if (ctx.SemanticModel.GetDeclaredSymbol(ctx.Node, ct) is not INamedTypeSymbol symbol)
             return null;
 
+        // A partial interface is visited once per declaration. Only its first candidate
+        // declaration builds the model, or the same file would be added twice (CS8785).
+        if (!IsFirstCandidateDeclaration(ctx.Node, symbol, ct))
+            return null;
+
         var ifaceAttr = FindCacheAttr(symbol);
         var ifaceConfig = ifaceAttr != null ? ReadConfig(ifaceAttr) : null;
 
@@ -99,9 +118,25 @@ public sealed class CacheGenerator : IIncrementalGenerator
             ? null
             : symbol.ContainingNamespace.ToDisplayString();
 
-        var ifaceFqn = symbol.ContainingNamespace.IsGlobalNamespace
-            ? symbol.Name
-            : symbol.ContainingNamespace.ToDisplayString() + "." + symbol.Name;
+        // An interface no proxy can be generated for carries only the diagnostic that says why.
+        var unsupported = ContainingTypes.Check(symbol, ct);
+        if (unsupported is not null)
+            return Unsupported(symbol, ns, unsupported);
+
+        return BuildModel(ctx, symbol, ns, cachedMethods, passthroughMethods, diagnostics);
+    }
+
+    private static CacheModel BuildModel(
+        GeneratorSyntaxContext ctx,
+        INamedTypeSymbol symbol,
+        string? ns,
+        System.Collections.Generic.List<CachedMethodModel> cachedMethods,
+        System.Collections.Generic.List<PassthroughMethodModel> passthroughMethods,
+        System.Collections.Generic.List<DiagnosticInfo> diagnostics)
+    {
+        var containers = ContainingTypes.Of(symbol);
+        // The fully qualified name without its global:: prefix, with keywords escaped.
+        var ifaceFqn = symbol.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat).Substring("global::".Length);
 
         var isolatedCacheMaxEntries = FirstMaxEntries(cachedMethods);
 
@@ -113,6 +148,14 @@ public sealed class CacheGenerator : IIncrementalGenerator
             symbol.Name,
             ifaceFqn,
             HintNames.ForHost(symbol),
+            symbol.ToDisplayString(),
+            LocationInfo.FirstDeclaration(symbol),
+            ContainingTypes.Headers(containers),
+            containers.Count == 0
+                ? string.Empty
+                : symbol.ContainingType.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat) + ".",
+            KeyName(symbol, containers),
+            ExtensionMethodName(symbol, containers),
             IsPubliclyAccessible(symbol),
             cachedMethods.Exists(static m => m.EffectiveConfig.UseHybridCache),
             cachedMethods.Exists(static m => !m.EffectiveConfig.UseHybridCache && m.EffectiveConfig.MaxEntries == 0),
@@ -123,6 +166,81 @@ public sealed class CacheGenerator : IIncrementalGenerator
             System.Collections.Immutable.ImmutableArray.CreateRange(passthroughMethods),
             System.Collections.Immutable.ImmutableArray.CreateRange(diagnostics)
         );
+    }
+
+    private static CacheModel Unsupported(INamedTypeSymbol symbol, string? ns, DiagnosticInfo diagnostic) =>
+        new(
+            ns,
+            symbol.Name,
+            string.Empty,
+            HintNames.ForHost(symbol),
+            symbol.ToDisplayString(),
+            LocationInfo.FirstDeclaration(symbol),
+            System.Collections.Immutable.ImmutableArray<string>.Empty,
+            string.Empty,
+            string.Empty,
+            string.Empty,
+            false,
+            false,
+            false,
+            false,
+            0,
+            false,
+            System.Collections.Immutable.ImmutableArray<CachedMethodModel>.Empty,
+            System.Collections.Immutable.ImmutableArray<PassthroughMethodModel>.Empty,
+            System.Collections.Immutable.ImmutableArray.Create(diagnostic));
+
+    /// <summary>
+    /// True when <paramref name="node"/> is the first declaration of <paramref name="symbol"/>
+    /// that the syntax predicate picks, so a partial interface builds one model.
+    /// </summary>
+    private static bool IsFirstCandidateDeclaration(
+        SyntaxNode node, INamedTypeSymbol symbol, System.Threading.CancellationToken ct)
+    {
+        foreach (var reference in symbol.DeclaringSyntaxReferences)
+        {
+            var declaration = reference.GetSyntax(ct);
+            if (!IsCandidateInterface(declaration)) continue;
+            return declaration.SyntaxTree == node.SyntaxTree && declaration.Span == node.Span;
+        }
+        return false;
+    }
+
+    /// <summary>
+    /// The interface's name in cache keys and in the <c>cache.method</c> telemetry tag. At the top
+    /// of a namespace it is the interface's name, as it always was. A nested interface is prefixed
+    /// with its containing types, <c>Outer.IFoo</c>, so two same-named nested interfaces never
+    /// read each other's entries from the shared cache.
+    /// </summary>
+    private static string KeyName(
+        INamedTypeSymbol symbol, System.Collections.Generic.IReadOnlyList<INamedTypeSymbol> containers)
+    {
+        var sb = new System.Text.StringBuilder();
+        for (var i = 0; i < containers.Count; i++)
+            sb.Append(containers[i].Name).Append('.');
+        return sb.Append(symbol.Name).ToString();
+    }
+
+    /// <summary>
+    /// The name of the <c>Add...Cache</c> extension method: <c>AddFooCache</c> for <c>IFoo</c>. The
+    /// method sits in a class at namespace level, so a nested interface is prefixed with its
+    /// containing types, joined with underscores as the ZeroAlloc.EventSourcing registry names are:
+    /// <c>AddOuter_FooCache</c> for <c>Outer.IFoo</c>.
+    /// </summary>
+    private static string ExtensionMethodName(
+        INamedTypeSymbol symbol, System.Collections.Generic.IReadOnlyList<INamedTypeSymbol> containers)
+    {
+        var sb = new System.Text.StringBuilder("Add");
+        for (var i = 0; i < containers.Count; i++)
+            sb.Append(containers[i].Name).Append('_');
+        return sb.Append(StripInterfacePrefix(symbol.Name)).Append("Cache").ToString();
+    }
+
+    private static string StripInterfacePrefix(string name)
+    {
+        if (name.Length > 1 && name[0] == 'I' && char.IsUpper(name[1]))
+            return name.Substring(1);
+        return name;
     }
 
     /// <summary>

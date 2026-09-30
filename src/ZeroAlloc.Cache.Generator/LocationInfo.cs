@@ -39,4 +39,27 @@ internal sealed record LocationInfo(SyntaxTree Tree, TextSpan Span)
     /// <summary>The identifier of a symbol declared in source.</summary>
     public static LocationInfo? From(ISymbol symbol) =>
         symbol.Locations.Length > 0 ? From(symbol.Locations[0]) : null;
+
+    /// <summary>
+    /// The identifier of the symbol's first declaration by file path and then position, the same
+    /// whatever the order of the syntax trees, for a type declared in several parts.
+    /// </summary>
+    public static LocationInfo? FirstDeclaration(ISymbol symbol)
+    {
+        LocationInfo? first = null;
+        foreach (var location in symbol.Locations)
+        {
+            var info = From(location);
+            if (info is null) continue;
+            if (first is null || CompareDeclarationOrder(info, first) < 0) first = info;
+        }
+        return first;
+    }
+
+    /// <summary>Orders locations by file path, then by position within the file.</summary>
+    public static int CompareDeclarationOrder(LocationInfo? x, LocationInfo? y)
+    {
+        var byPath = string.CompareOrdinal(x?.Tree.FilePath, y?.Tree.FilePath);
+        return byPath != 0 ? byPath : (x?.Span.Start ?? 0).CompareTo(y?.Span.Start ?? 0);
+    }
 }

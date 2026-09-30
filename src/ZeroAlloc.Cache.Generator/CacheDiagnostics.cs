@@ -53,4 +53,64 @@ internal static class CacheDiagnostics
         category: Category,
         defaultSeverity: DiagnosticSeverity.Warning,
         isEnabledByDefault: true);
+
+    /// <summary>
+    /// A nested interface whose containing type is not <c>partial</c>. The proxy is generated
+    /// inside the containing types, which only a partial type allows. See #194.
+    /// </summary>
+    public static readonly DiagnosticDescriptor ContainingTypeNotPartial = new(
+        id: "ZC0006",
+        title: "Containing type of a [Cache] interface is not partial",
+        messageFormat: "No cache proxy is generated for interface '{0}' because its containing type '{1}' is not partial",
+        category: Category,
+        defaultSeverity: DiagnosticSeverity.Warning,
+        isEnabledByDefault: true);
+
+    /// <summary>
+    /// A generic interface, or one nested in a generic type. Its Add...Cache extension method has
+    /// to sit in a non-generic class at namespace level, and cannot name the type parameter. See #194.
+    /// </summary>
+    public static readonly DiagnosticDescriptor GenericInterface = new(
+        id: "ZC0007",
+        title: "Generic [Cache] interface is not generated",
+        messageFormat: "No cache proxy is generated for interface '{0}' because it is generic or nested in a generic type, which its Add...Cache extension method cannot name",
+        category: Category,
+        defaultSeverity: DiagnosticSeverity.Warning,
+        isEnabledByDefault: true);
+
+    /// <summary>
+    /// A private or protected interface, or one nested in such a type. Its Add...Cache extension
+    /// method sits at namespace level, where the interface is not accessible. See #194.
+    /// </summary>
+    public static readonly DiagnosticDescriptor InterfaceNotAccessible = new(
+        id: "ZC0008",
+        title: "[Cache] interface is not accessible from its namespace",
+        messageFormat: "No cache proxy is generated for interface '{0}' because it is private or protected, or nested in such a type, which its Add...Cache extension method cannot name",
+        category: Category,
+        defaultSeverity: DiagnosticSeverity.Warning,
+        isEnabledByDefault: true);
+
+    /// <summary>
+    /// A file-local interface, or one nested in a file-local type. A generated file cannot refer
+    /// to it. See #194.
+    /// </summary>
+    public static readonly DiagnosticDescriptor FileLocalInterface = new(
+        id: "ZC0009",
+        title: "File-local [Cache] interface is not generated",
+        messageFormat: "No cache proxy is generated for interface '{0}' because it is file-local or nested in a file-local type, and a generated file cannot refer to a file-local type",
+        category: Category,
+        defaultSeverity: DiagnosticSeverity.Error,
+        isEnabledByDefault: true);
+
+    /// <summary>
+    /// Roslyn compares hint names ignoring case, so an interface whose qualified name differs only
+    /// in case from an earlier one's cannot get its own file. See #197.
+    /// </summary>
+    public static readonly DiagnosticDescriptor NameDiffersOnlyInCase = new(
+        id: "ZC0010",
+        title: "Interface name differs only in case from another [Cache] interface",
+        messageFormat: "No cache proxy is generated for interface '{0}' because its file name '{1}' differs only in case from that of interface '{2}'",
+        category: Category,
+        defaultSeverity: DiagnosticSeverity.Error,
+        isEnabledByDefault: true);
 }

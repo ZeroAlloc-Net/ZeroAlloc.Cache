@@ -99,6 +99,24 @@ using (var valueCache = new MemoryCache(new MemoryCacheOptions()))
     }
 }
 
+// A nested interface through its generated DI extension. See #194.
+var people = new Staff.People();
+var staffServices = new ServiceCollection();
+staffServices.AddStaff_PeopleCache<Staff.People>();
+// Replaces the transient registration of the inner implementation with the counted instance.
+staffServices.AddTransient(_ => people);
+var staffProvider = staffServices.BuildServiceProvider();
+await using (staffProvider.ConfigureAwait(false))
+{
+    var staff = staffProvider.GetRequiredService<Staff.IPeople>();
+    var n1 = await staff.GetNameAsync(5, CancellationToken.None).ConfigureAwait(false);
+    var n2 = await staff.GetNameAsync(5, CancellationToken.None).ConfigureAwait(false);
+    if (!string.Equals(n1, "person-5", StringComparison.Ordinal) || !string.Equals(n2, n1, StringComparison.Ordinal))
+        return Fail($"Nested interface returned '{n1}' and '{n2}'");
+    if (people.CallCount != 1)
+        return Fail($"Nested interface: expected a cache hit, CallCount is {people.CallCount}");
+}
+
 Console.WriteLine("AOT smoke: PASS");
 return 0;
 
