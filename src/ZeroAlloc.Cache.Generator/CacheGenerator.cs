@@ -19,6 +19,9 @@ public sealed class CacheGenerator : IIncrementalGenerator
     /// <summary>The tracking name of the step that finds case-only hint-name collisions.</summary>
     internal const string CaseCollisionsTrackingName = "CacheCaseCollisions";
 
+    /// <summary>The tracking name of the step that finds interfaces whose names must be qualified.</summary>
+    internal const string NameCollisionsTrackingName = "CacheNameCollisions";
+
     public void Initialize(IncrementalGeneratorInitializationContext context)
     {
         var models = context.SyntaxProvider
@@ -44,14 +47,23 @@ public sealed class CacheGenerator : IIncrementalGenerator
 
         var skippedHintNames = collisions.Select(static (found, _) => found.SkippedHintNames);
 
-        context.RegisterSourceOutput(models.Combine(skippedHintNames), static (ctx, pair) =>
+        // Interfaces that would share cache keys or an Add...Cache method with another get
+        // qualified names; every other interface keeps its own. See #199. The result holds only
+        // hint names, so it stays equal, and every output cached, unless a name changes.
+        var nameCollisions = models
+            .Collect()
+            .Combine(skippedHintNames)
+            .Select(static (pair, _) => NameCollisions.Find(pair.Left, pair.Right))
+            .WithTrackingName(NameCollisionsTrackingName);
+
+        context.RegisterSourceOutput(models.Combine(skippedHintNames).Combine(nameCollisions), static (ctx, pair) =>
         {
-            var (model, skipped) = pair;
+            var ((model, skipped), names) = pair;
             foreach (var d in model.Diagnostics)
                 ctx.ReportDiagnostic(d.ToDiagnostic());
 
             if (model.IsGenerated && !skipped.Contains(model.HintName, System.StringComparer.Ordinal))
-                CacheWriter.Write(ctx, model);
+                CacheWriter.Write(ctx, names.Apply(model));
         });
     }
 
@@ -156,6 +168,8 @@ public sealed class CacheGenerator : IIncrementalGenerator
                 : symbol.ContainingType.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat) + ".",
             KeyName(symbol, containers),
             ExtensionMethodName(symbol, containers),
+            QualifiedKeyName(symbol, containers),
+            QualifiedExtensionMethodName(symbol, containers),
             IsPubliclyAccessible(symbol),
             cachedMethods.Exists(static m => m.EffectiveConfig.UseHybridCache),
             cachedMethods.Exists(static m => !m.EffectiveConfig.UseHybridCache && m.EffectiveConfig.MaxEntries == 0),
@@ -177,6 +191,8 @@ public sealed class CacheGenerator : IIncrementalGenerator
             symbol.ToDisplayString(),
             LocationInfo.FirstDeclaration(symbol),
             System.Collections.Immutable.ImmutableArray<string>.Empty,
+            string.Empty,
+            string.Empty,
             string.Empty,
             string.Empty,
             string.Empty,
@@ -234,6 +250,43 @@ public sealed class CacheGenerator : IIncrementalGenerator
         for (var i = 0; i < containers.Count; i++)
             sb.Append(containers[i].Name).Append('_');
         return sb.Append(StripInterfacePrefix(symbol.Name)).Append("Cache").ToString();
+    }
+
+    /// <summary>
+    /// The key name for an interface whose key another interface shares: <see cref="KeyName"/>
+    /// after the namespace, <c>M1.IX</c> for <c>M1.IX</c>. In the global namespace it is the key
+    /// name itself. See #199.
+    /// </summary>
+    private static string QualifiedKeyName(
+        INamedTypeSymbol symbol, System.Collections.Generic.IReadOnlyList<INamedTypeSymbol> containers)
+    {
+        var sb = new System.Text.StringBuilder();
+        AppendNamespace(sb, symbol.ContainingNamespace, '.');
+        return sb.Append(KeyName(symbol, containers)).ToString();
+    }
+
+    /// <summary>
+    /// The method name for an interface whose <c>Add...Cache</c> method another interface of its
+    /// namespace shares: the namespace, the containing types and the whole interface name, joined
+    /// with underscores, so <c>N.IFoo</c> and <c>N.Foo</c> get <c>AddN_IFooCache</c> and
+    /// <c>AddN_FooCache</c>. See #199.
+    /// </summary>
+    private static string QualifiedExtensionMethodName(
+        INamedTypeSymbol symbol, System.Collections.Generic.IReadOnlyList<INamedTypeSymbol> containers)
+    {
+        var sb = new System.Text.StringBuilder("Add");
+        AppendNamespace(sb, symbol.ContainingNamespace, '_');
+        for (var i = 0; i < containers.Count; i++)
+            sb.Append(containers[i].Name).Append('_');
+        return sb.Append(symbol.Name).Append("Cache").ToString();
+    }
+
+    // The namespace's names, outermost first, each followed by the separator.
+    private static void AppendNamespace(System.Text.StringBuilder sb, INamespaceSymbol? ns, char separator)
+    {
+        if (ns is null || ns.IsGlobalNamespace) return;
+        AppendNamespace(sb, ns.ContainingNamespace, separator);
+        sb.Append(ns.Name).Append(separator);
     }
 
     private static string StripInterfacePrefix(string name)

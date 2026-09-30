@@ -44,6 +44,8 @@ This registers:
 
 No manual factory wiring is required.
 
+When two interfaces in one namespace would get the same method name, such as `IProductRepository` and `ProductRepository`, both keep their whole name and start with the namespace instead: `AddShop_IProductRepositoryCache` and `AddShop_ProductRepositoryCache` in namespace `Shop`. Every other interface keeps the shorter name.
+
 ### Nested interfaces
 
 An interface nested in another type works too. Its proxy is generated inside the containing type, so every containing type must be `partial`, or the generator reports [ZC0006](diagnostics/ZC0006.md). The extension method sits at namespace level and is named after the containing types, joined with underscores: `Catalog.IProductLookup` produces `AddCatalog_ProductLookupCache`.
