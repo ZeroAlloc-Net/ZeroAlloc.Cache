@@ -112,6 +112,7 @@ public sealed class CacheGenerator : IIncrementalGenerator
             ns,
             symbol.Name,
             ifaceFqn,
+            HintNames.ForHost(symbol),
             IsPubliclyAccessible(symbol),
             cachedMethods.Exists(static m => m.EffectiveConfig.UseHybridCache),
             cachedMethods.Exists(static m => !m.EffectiveConfig.UseHybridCache && m.EffectiveConfig.MaxEntries == 0),
