@@ -100,7 +100,8 @@ public sealed class NestedInterfaceTests
             """.ReplaceLineEndings("\n"));
         source.Should().Contain("\n        internal sealed class IFooBoundedCache : global::System.IDisposable\n");
         source.Should().Contain("""
-            internal static partial class CacheServiceCollectionExtensions
+
+            static partial class CacheServiceCollectionExtensions
             {
                 internal static global::Microsoft.Extensions.DependencyInjection.IServiceCollection AddOuter_Middle_FooCache<
             """.ReplaceLineEndings("\n"));
@@ -243,7 +244,9 @@ public sealed class NestedInterfaceTests
             """);
 
         run.ShouldCompileCleanly();
-        run.Sources["N.Outer+IFoo.Cache.g.cs"].Should().Contain("internal static partial class CacheServiceCollectionExtensions");
+        var source = run.Sources["N.Outer+IFoo.Cache.g.cs"];
+        source.Should().Contain("\nstatic partial class CacheServiceCollectionExtensions");
+        source.Should().Contain("internal static global::Microsoft.Extensions.DependencyInjection.IServiceCollection AddOuter_FooCache<");
     }
 
     [Fact]
