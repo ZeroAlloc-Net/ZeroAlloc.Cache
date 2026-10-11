@@ -105,3 +105,33 @@ public interface IProductRepository
 ```
 
 > **Note:** Do not combine `Sliding = true` with `UseHybridCache = true`. HybridCache's distributed (L2) tier uses absolute TTL only; sliding is silently ignored. The compiler will emit a [ZC0001](diagnostics/ZC0001.md) warning.
+
+### HybridCache under NativeAOT
+
+The `IMemoryCache` path needs nothing extra under NativeAOT. `HybridCache` does: it serializes every value it stores, and for any type but `string` and `byte[]` its default serializer uses reflection-based `System.Text.Json`, which throws `Reflection-based serialization has been disabled` on the first cache miss in a NativeAOT app. Register a serializer for each cached type, backed by source-generated metadata:
+
+```csharp
+[JsonSerializable(typeof(Product))]
+internal sealed partial class AppJsonContext : JsonSerializerContext;
+
+public sealed class ProductSerializer : IHybridCacheSerializer<Product>
+{
+    public Product Deserialize(ReadOnlySequence<byte> source)
+    {
+        var reader = new Utf8JsonReader(source);
+        return JsonSerializer.Deserialize(ref reader, AppJsonContext.Default.Product)!;
+    }
+
+    public void Serialize(Product value, IBufferWriter<byte> target)
+    {
+        using var writer = new Utf8JsonWriter(target);
+        JsonSerializer.Serialize(writer, value, AppJsonContext.Default.Product);
+    }
+}
+
+builder.Services.AddHybridCache().AddSerializer<Product, ProductSerializer>();
+```
+
+In a project with `PublishAot`, `IsAotCompatible` or `PublishTrimmed`, the generator reports [ZC0011](diagnostics/ZC0011.md) for each `HybridCache` method whose type has no serializer. That page also shows a generic serializer and a serializer factory for many types.
+
+`Microsoft.Extensions.Caching.Hybrid` is not trim-clean itself yet, [dotnet/extensions#5624](https://github.com/dotnet/extensions/issues/5624): publishing with `HybridCache` reports the package's own trim warnings (IL2104, IL3053, IL2026) even with serializers registered.

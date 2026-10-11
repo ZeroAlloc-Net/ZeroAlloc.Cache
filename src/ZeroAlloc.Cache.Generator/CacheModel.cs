@@ -22,7 +22,8 @@ internal sealed record CacheModel(
     bool SpanKeyLookupAvailable,          // MemoryCache.TryGetValue(ReadOnlySpan<char>, out object?) is usable, #185
     ImmutableArray<CachedMethodModel> CachedMethods,
     ImmutableArray<PassthroughMethodModel> PassthroughMethods,
-    ImmutableArray<DiagnosticInfo> Diagnostics
+    ImmutableArray<DiagnosticInfo> Diagnostics,
+    ImmutableArray<HybridValueUse> HybridValueUses // hybrid methods whose value type ZC0011 checks
 )
 {
     /// <summary>
@@ -89,7 +90,8 @@ internal sealed record CacheModel(
             && SpanKeyLookupAvailable == other.SpanKeyLookupAvailable
             && ArraysEqual(CachedMethods, other.CachedMethods)
             && ArraysEqual(PassthroughMethods, other.PassthroughMethods)
-            && ArraysEqual(Diagnostics, other.Diagnostics);
+            && ArraysEqual(Diagnostics, other.Diagnostics)
+            && ArraysEqual(HybridValueUses, other.HybridValueUses);
     }
 
     public override int GetHashCode()

@@ -35,6 +35,10 @@
       <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
     </PackageReference>
   </ItemGroup>
+  <!-- The MSBuild properties the generator reads, see build/ZeroAlloc.Cache.props. -->
+  <ItemGroup>
+    <None Include="build\ZeroAlloc.Cache.props" Pack="true" PackagePath="build;buildTransitive" />
+  </ItemGroup>
   <ItemGroup>
     <AdditionalFiles Include="PublicAPI.Shipped.txt" />
     <AdditionalFiles Include="PublicAPI.Unshipped.txt" />

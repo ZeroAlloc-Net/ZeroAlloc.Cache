@@ -1,0 +1,13 @@
+<Project>
+  <!--
+    Shipped in the package under build/ and buildTransitive/, and in ZeroAlloc.Cache.Generator.
+    The generator reads these properties to tell whether the project is published with NativeAOT
+    or trimming: ZC0011 is reported only then. The SDK exposes some of them only while its trim
+    or AOT analyzers are on, so the package declares them itself.
+  -->
+  <ItemGroup>
+    <CompilerVisibleProperty Include="PublishAot" />
+    <CompilerVisibleProperty Include="IsAotCompatible" />
+    <CompilerVisibleProperty Include="PublishTrimmed" />
+  </ItemGroup>
+</Project>

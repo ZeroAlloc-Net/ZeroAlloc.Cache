@@ -55,6 +55,25 @@ public class AdopterReportedTests
             """);
     }
 
+    // A HybridCache method with neither key parameters nor a CancellationToken: the factory
+    // passed the factory's token to a method that takes no arguments, CS1501. Found under #223.
+    [Theory]
+    [InlineData("ValueTask<string> GetAsync();")]
+    [InlineData("Task<int> CountAsync();")]
+    public async Task HybridMethodWithoutParameters_GeneratesCompilableCode(string method)
+    {
+        await AssertCompilesCleanlyAsync($$"""
+            using System.Threading.Tasks;
+            using ZeroAlloc.Cache;
+
+            public interface IThing
+            {
+                [Cache(TtlMs = 10000, UseHybridCache = true)]
+                {{method}}
+            }
+            """);
+    }
+
     [Fact]
     public async Task ValueTypeStructReturn_GeneratesCompilableCode()
     {

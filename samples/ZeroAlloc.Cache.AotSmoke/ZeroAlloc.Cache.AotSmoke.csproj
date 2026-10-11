@@ -6,8 +6,6 @@
     <PublishAot>true</PublishAot>
     <InvariantGlobalization>true</InvariantGlobalization>
     <OptimizationPreference>Size</OptimizationPreference>
-
-    <WarningsAsErrors>$(WarningsAsErrors);IL2026;IL2067;IL2075;IL2091;IL3050;IL3051</WarningsAsErrors>
   </PropertyGroup>
 
   <ItemGroup>
@@ -21,4 +19,34 @@
                       ReferenceOutputAssembly="false"
                       UndefineProperties="PublishAot" />
   </ItemGroup>
+
+  <!-- What the package's build/ folder gives a consumer: the properties ZC0011 reads. -->
+  <Import Project="..\..\src\ZeroAlloc.Cache\build\ZeroAlloc.Cache.props" />
+
+  <!--
+    Microsoft.Extensions.Caching.Hybrid 10.10.0 is not trim or AOT clean, upstream
+    dotnet/extensions#5624. Published with -p:TrimmerSingleWarn=false, every warning is inside
+    that one assembly, none in ours:
+      IL2026  DefaultJsonSerializerFactory serializes with JsonSerializer and
+      IL3050  JsonSerializerOptions.Default, which need reflection. This is the default
+              serializer that throws at run time for any type but string and byte[]; the smoke
+              registers PriceSerializer for int instead, and ZC0011 asks consumers to do the same.
+      IL2070  DefaultJsonSerializerFactory.IsFieldOnlyType reflects over the value type's
+              interfaces, fields and properties without annotations.
+    They roll up as IL2104 and IL3053, which only this assembly may produce:
+    TrimWarningRollups.targets reports every other assembly's warnings under their own codes.
+    ILC also reports three of Hybrid's IL2026 one by one next to the rollup, in any app that
+    calls AddHybridCache, so IL2026 is non-fatal here too. ILC cannot scope that to one
+    assembly, so the aot-smoke CI job fails on any IL warning whose origin is not Hybrid.
+    Build-time trim analysis keeps IL2026 fatal in ZeroAlloc.Cache, the generated proxies and
+    this smoke. This is a workaround for the upstream issue; remove it once Hybrid publishes
+    clean: ZeroAlloc-Net/ZeroAlloc.Cache#224.
+  -->
+  <PropertyGroup>
+    <WarningsNotAsErrors>$(WarningsNotAsErrors);IL2104;IL3053;IL2026</WarningsNotAsErrors>
+  </PropertyGroup>
+  <ItemGroup>
+    <AllowedTrimWarningRollup Include="Microsoft.Extensions.Caching.Hybrid" />
+  </ItemGroup>
+  <Import Project="..\Shared\TrimWarningRollups.targets" />
 </Project>

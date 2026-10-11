@@ -22,6 +22,9 @@ public sealed class CacheGenerator : IIncrementalGenerator
     /// <summary>The tracking name of the step that finds interfaces whose names must be qualified.</summary>
     internal const string NameCollisionsTrackingName = "CacheNameCollisions";
 
+    /// <summary>The tracking name of the step that finds the HybridCache value types ZC0011 checks.</summary>
+    internal const string HybridValueUsesTrackingName = "CacheHybridValueUses";
+
     public void Initialize(IncrementalGeneratorInitializationContext context)
     {
         var models = context.SyntaxProvider
@@ -64,6 +67,57 @@ public sealed class CacheGenerator : IIncrementalGenerator
 
             if (model.IsGenerated && !skipped.Contains(model.HintName, System.StringComparer.Ordinal))
                 CacheWriter.Write(ctx, names.Apply(model));
+        });
+
+        RegisterHybridSerializerCheck(context, models);
+    }
+
+    /// <summary>
+    /// ZC0011: in an AOT or trimmed project, a HybridCache value type other than string and byte[]
+    /// needs an IHybridCacheSerializer. Referenced assemblies are searched only while a project is
+    /// AOT or trimmed and has such a method, so other projects never pay for it. See #223.
+    /// </summary>
+    private static void RegisterHybridSerializerCheck(
+        IncrementalGeneratorInitializationContext context, IncrementalValuesProvider<CacheModel> models)
+    {
+        var isAot = context.AnalyzerConfigOptionsProvider
+            .Select(static (options, _) => HybridSerializers.IsAotOrTrimmed(options.GlobalOptions));
+
+        var uses = models
+            .Collect()
+            .Combine(isAot)
+            .Select(static (pair, _) => pair.Right ? HybridSerializers.Uses(pair.Left) : EquatableArray<HybridValueUse>.Empty)
+            .WithTrackingName(HybridValueUsesTrackingName);
+
+        var sourceSerializers = context.SyntaxProvider
+            .CreateSyntaxProvider(
+                predicate: static (node, _) => node is ClassDeclarationSyntax { BaseList: not null }
+                    or StructDeclarationSyntax { BaseList: not null }
+                    or RecordDeclarationSyntax { BaseList: not null },
+                transform: static (ctx, ct) => ctx.SemanticModel.GetDeclaredSymbol(ctx.Node, ct) is INamedTypeSymbol type
+                    ? HybridSerializers.ImplementedBy(type)
+                    : HybridSerializerSet.Empty)
+            .Where(static set => !set.IsEmpty)
+            .Collect()
+            .Select(static (sets, _) => HybridSerializerSet.Merge(sets));
+
+        var referencedSerializers = uses
+            .Combine(context.CompilationProvider)
+            .Select(static (pair, ct) => pair.Left.Items.IsEmpty
+                ? HybridSerializerSet.Empty
+                : HybridSerializers.InReferences(pair.Right, ct));
+
+        var diagnostics = uses
+            .Combine(sourceSerializers)
+            .Combine(referencedSerializers)
+            .Select(static (pair, _) => HybridSerializers.Report(
+                pair.Left.Left,
+                HybridSerializerSet.Merge(new[] { pair.Left.Right, pair.Right })));
+
+        context.RegisterSourceOutput(diagnostics, static (ctx, found) =>
+        {
+            foreach (var d in found.Items)
+                ctx.ReportDiagnostic(d.ToDiagnostic());
         });
     }
 
@@ -116,11 +170,12 @@ public sealed class CacheGenerator : IIncrementalGenerator
         var cachedMethods = new System.Collections.Generic.List<CachedMethodModel>();
         var passthroughMethods = new System.Collections.Generic.List<PassthroughMethodModel>();
         var diagnostics = new System.Collections.Generic.List<DiagnosticInfo>();
+        var hybridValueUses = new System.Collections.Generic.List<HybridValueUse>();
 
         foreach (var member in symbol.GetMembers())
         {
             ct.ThrowIfCancellationRequested();
-            ParseMember(member, ifaceConfig, cachedMethods, passthroughMethods, diagnostics);
+            ParseMember(member, ifaceConfig, cachedMethods, passthroughMethods, diagnostics, hybridValueUses);
         }
 
         if (cachedMethods.Count == 0 && passthroughMethods.Count == 0 && diagnostics.Count == 0)
@@ -135,7 +190,7 @@ public sealed class CacheGenerator : IIncrementalGenerator
         if (unsupported is not null)
             return Unsupported(symbol, ns, unsupported);
 
-        return BuildModel(ctx, symbol, ns, cachedMethods, passthroughMethods, diagnostics);
+        return BuildModel(ctx, symbol, ns, cachedMethods, passthroughMethods, diagnostics, hybridValueUses);
     }
 
     private static CacheModel BuildModel(
@@ -144,7 +199,8 @@ public sealed class CacheGenerator : IIncrementalGenerator
         string? ns,
         System.Collections.Generic.List<CachedMethodModel> cachedMethods,
         System.Collections.Generic.List<PassthroughMethodModel> passthroughMethods,
-        System.Collections.Generic.List<DiagnosticInfo> diagnostics)
+        System.Collections.Generic.List<DiagnosticInfo> diagnostics,
+        System.Collections.Generic.List<HybridValueUse> hybridValueUses)
     {
         var containers = ContainingTypes.Of(symbol);
         // The fully qualified name without its global:: prefix, with keywords escaped.
@@ -178,7 +234,8 @@ public sealed class CacheGenerator : IIncrementalGenerator
             IsSpanKeyLookupAvailable(ctx.SemanticModel.Compilation, ctx.Node.SyntaxTree.Options),
             System.Collections.Immutable.ImmutableArray.CreateRange(cachedMethods),
             System.Collections.Immutable.ImmutableArray.CreateRange(passthroughMethods),
-            System.Collections.Immutable.ImmutableArray.CreateRange(diagnostics)
+            System.Collections.Immutable.ImmutableArray.CreateRange(diagnostics),
+            System.Collections.Immutable.ImmutableArray.CreateRange(hybridValueUses)
         );
     }
 
@@ -204,7 +261,8 @@ public sealed class CacheGenerator : IIncrementalGenerator
             false,
             System.Collections.Immutable.ImmutableArray<CachedMethodModel>.Empty,
             System.Collections.Immutable.ImmutableArray<PassthroughMethodModel>.Empty,
-            System.Collections.Immutable.ImmutableArray.Create(diagnostic));
+            System.Collections.Immutable.ImmutableArray.Create(diagnostic),
+            System.Collections.Immutable.ImmutableArray<HybridValueUse>.Empty);
 
     /// <summary>
     /// True when <paramref name="node"/> is the first declaration of <paramref name="symbol"/>
@@ -329,7 +387,8 @@ public sealed class CacheGenerator : IIncrementalGenerator
         CacheConfig? ifaceConfig,
         System.Collections.Generic.List<CachedMethodModel> cachedMethods,
         System.Collections.Generic.List<PassthroughMethodModel> passthroughMethods,
-        System.Collections.Generic.List<DiagnosticInfo> diagnostics)
+        System.Collections.Generic.List<DiagnosticInfo> diagnostics,
+        System.Collections.Generic.List<HybridValueUse> hybridValueUses)
     {
         if (member is not IMethodSymbol method)
             return;
@@ -369,6 +428,17 @@ public sealed class CacheGenerator : IIncrementalGenerator
         }
 
         EmitDiagnostics(method, methodAttr, effectiveConfig!, keyParams, diagnostics);
+
+        // ZC0011 is decided later, against the project's settings and serializers. It points at
+        // the method's own [Cache] when that set UseHybridCache, as ZC0001 does.
+        if (effectiveConfig!.UseHybridCache)
+        {
+            var use = HybridSerializers.UseOf(
+                method.Name,
+                ((INamedTypeSymbol)method.ReturnType).TypeArguments[0],
+                (methodAttr is null ? null : LocationInfo.From(methodAttr)) ?? LocationInfo.From(method));
+            if (use is not null) hybridValueUses.Add(use);
+        }
         AddCachedMethod(method, effectiveConfig!, paramList, argList, keyArgs,
             hasCt, ctParamName, keyParams, cachedMethods);
     }

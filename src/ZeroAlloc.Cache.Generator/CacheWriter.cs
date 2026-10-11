@@ -468,9 +468,11 @@ internal static class CacheWriter
         var methodTag = $"new global::System.Collections.Generic.KeyValuePair<string, object?>(\"method\", \"{m.Name}\")";
         if (m.KeyParams.IsEmpty)
         {
+            // The factory always receives HybridCache's token; the method gets it only if it takes one.
+            var args = m.HasCancellationToken ? ctName : string.Empty;
             return (
                 "_inner",
-                $"static async (inner, {ctName}) => {{ _hybridCalls.Add(1, {methodTag}); return await inner.{m.Name}({ctName}).ConfigureAwait(false); }}");
+                $"static async (inner, {ctName}) => {{ _hybridCalls.Add(1, {methodTag}); return await inner.{m.Name}({args}).ConfigureAwait(false); }}");
         }
 
         var combinedSb = new System.Text.StringBuilder();
