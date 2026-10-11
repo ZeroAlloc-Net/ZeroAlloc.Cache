@@ -1,6 +1,7 @@
 using System;
 using System.Threading;
 using System.Threading.Tasks;
+using Microsoft.Extensions.Caching.Hybrid;
 using Microsoft.Extensions.Caching.Memory;
 using Microsoft.Extensions.DependencyInjection;
 using ZeroAlloc.Cache.AotSmoke;
@@ -119,8 +120,11 @@ await using (staffProvider.ConfigureAwait(false))
 
 // UseHybridCache methods through the generated DI extension, which registers HybridCache. Two
 // separately resolved proxies share the container's HybridCache, so the second call is a hit.
+// The string method needs nothing more. The int method needs an AOT-safe serializer: without
+// it HybridCache's reflection-based default throws on the first miss, see ZC0011 and #223.
 var priceServices = new ServiceCollection();
 priceServices.AddSingleton<PriceCallLog>();
+priceServices.AddHybridCache().AddSerializer<int, PriceSerializer>();
 priceServices.AddPriceServiceCache<PriceService>();
 var priceProvider = priceServices.BuildServiceProvider();
 await using (priceProvider.ConfigureAwait(false))

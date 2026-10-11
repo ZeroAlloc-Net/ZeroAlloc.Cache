@@ -4,8 +4,8 @@ using System.Threading.Tasks;
 namespace ZeroAlloc.Cache.AotSmoke;
 
 // HybridCache methods, resolved through the generated DI extension, which registers
-// AddHybridCache. A string return and a value-type return: HybridCache serializes values
-// it cannot keep as immutable instances, so the value type exercises that path under AOT.
+// AddHybridCache. A string return and a value-type return: HybridCache serializes the int on a
+// miss with the serializer registered for it, PriceSerializer, which ZC0011 asks for under AOT.
 public interface IPriceService
 {
     [Cache(TtlMs = 60_000, UseHybridCache = true)]

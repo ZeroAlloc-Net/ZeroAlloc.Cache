@@ -60,10 +60,10 @@ jobs:
     # About 3x a normal run, which takes under a minute. A hang must fail the job, not hold
     # the runner until the 6-hour default. See #182.
     timeout-minutes: 3
-    # Publishes samples/ZeroAlloc.Cache.AotSmoke with PublishAot=true. The
+    # Publishes samples/ZeroAlloc.Cache.AotSmoke with PublishAot=true and runs it. The
     # generator emits an interface proxy — classic territory for reflection
-    # hazards — so this job catches any IL2026/IL3050 regression in the
-    # proxy emission before it ships.
+    # hazards — so this job catches any trim or AOT warning in the proxy emission
+    # before it ships, and runs the IMemoryCache and HybridCache paths.
     steps:
       - uses: actions/checkout@v7
         with:
@@ -100,7 +100,23 @@ jobs:
         run: dotnet restore samples/ZeroAlloc.Cache.AotSmoke/ZeroAlloc.Cache.AotSmoke.csproj
 
       - name: Publish AOT
-        run: dotnet publish samples/ZeroAlloc.Cache.AotSmoke/ZeroAlloc.Cache.AotSmoke.csproj -r linux-x64 -c Release -o ./aot-out
+        run: |
+          set -o pipefail
+          dotnet publish samples/ZeroAlloc.Cache.AotSmoke/ZeroAlloc.Cache.AotSmoke.csproj -r linux-x64 -c Release -o ./aot-out 2>&1 | tee publish.log
+
+      # The smoke lets Microsoft.Extensions.Caching.Hybrid through with IL2104, IL3053 and IL2026,
+      # which ILC cannot make non-fatal for one assembly only. Any IL warning from anywhere else
+      # fails here. Remove with the allowance once dotnet/extensions#5624 ships, see #224.
+      - name: Only Microsoft.Extensions.Caching.Hybrid may warn
+        run: |
+          others=$(grep -E 'warning IL[0-9]{4}' publish.log \
+            | grep -vE 'Microsoft\.Extensions\.Caching\.Hybrid\.dll : warning IL(2104|3053):' \
+            | grep -vE 'warning IL2026: Microsoft\.Extensions\.Caching\.Hybrid\.' || true)
+          if [ -n "$others" ]; then
+            echo "::error::IL warnings outside Microsoft.Extensions.Caching.Hybrid:"
+            echo "$others"
+            exit 1
+          fi
 
       # The smoke fails any call that takes over 10 seconds with a message naming it. This outer
       # limit is the backstop in case the process cannot exit; a normal run takes under a second.
