@@ -14,3 +14,4 @@
 | [ZC0008](diagnostics/ZC0008.md) | Private or protected nested interface |
 | [ZC0009](diagnostics/ZC0009.md) | File-local interface |
 | [ZC0010](diagnostics/ZC0010.md) | Interface name differs only in case from another's |
+| [ZC0011](diagnostics/ZC0011.md) | `HybridCache` value type without an AOT-safe serializer |

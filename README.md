@@ -8,7 +8,7 @@
 
 Source-generated zero-allocation caching proxy from an annotated interface.
 
-Add `[Cache]` to an interface and a Roslyn source generator emits a proxy class that transparently intercepts every method call, returning a cached result on hit with **no heap allocation on the cache-hit path** for `ValueTask<T>` methods on the default `MemoryCache` on .NET 9 and later. The few cases that still allocate are [listed](https://github.com/ZeroAlloc-Net/ZeroAlloc.Cache/blob/main/docs/performance.md#where-a-hit-still-allocates). Backed by `IMemoryCache` by default, with optional `HybridCache` (L1 + L2) opt-in per method. AOT-safe.
+Add `[Cache]` to an interface and a Roslyn source generator emits a proxy class that transparently intercepts every method call, returning a cached result on hit with **no heap allocation on the cache-hit path** for `ValueTask<T>` methods on the default `MemoryCache` on .NET 9 and later. The few cases that still allocate are [listed](https://github.com/ZeroAlloc-Net/ZeroAlloc.Cache/blob/main/docs/performance.md#where-a-hit-still-allocates). Backed by `IMemoryCache` by default, with optional `HybridCache` (L1 + L2) opt-in per method. The generated proxies are AOT-safe; under NativeAOT a `HybridCache` method returning anything but `string` or `byte[]` also needs a source-generated serializer, see [ZC0011](https://github.com/ZeroAlloc-Net/ZeroAlloc.Cache/blob/main/docs/diagnostics/ZC0011.md).
 
 ---
 
@@ -68,7 +68,7 @@ Full methodology + design analysis: [docs/performance.md](https://github.com/Zer
 | Method-level override | Any `[Cache]` on a method shadows the interface-level config for that method |
 | `MaxEntries` | Moves the method to an isolated `MemoryCache` with a `SizeLimit`, shared by all bounded methods of the interface for the lifetime of the container |
 | Compile-time key | The key expression is emitted by the generator. The key text is `Interface.Method:arg1:arg2`, the same on every path, so an entry can be read or removed by it, see [Cache keys](#cache-keys) |
-| AOT / trimmer safe | Generated proxy is concrete; no reflection at runtime |
+| AOT / trimmer safe | Generated proxy is concrete; no reflection at runtime. `HybridCache` itself serializes with reflection unless you register a serializer: under NativeAOT, a `HybridCache` method returning anything but `string` or `byte[]` needs an `IHybridCacheSerializer<T>`, which [ZC0011](https://github.com/ZeroAlloc-Net/ZeroAlloc.Cache/blob/main/docs/diagnostics/ZC0011.md) reports |
 | DI integration | Generated `Add{Service}Cache<TImpl>()` extension registers everything, e.g. `AddProductRepositoryCache` for `IProductRepository` |
 
 ---
@@ -137,6 +137,7 @@ services.AddOpenTelemetry()
 | [ZC0008](https://github.com/ZeroAlloc-Net/ZeroAlloc.Cache/blob/main/docs/diagnostics/ZC0008.md) | Warning | A private or protected nested interface, which the namespace-level `Add…Cache` method cannot name — no proxy is generated for it |
 | [ZC0009](https://github.com/ZeroAlloc-Net/ZeroAlloc.Cache/blob/main/docs/diagnostics/ZC0009.md) | Error | A file-local interface — no proxy is generated for it |
 | [ZC0010](https://github.com/ZeroAlloc-Net/ZeroAlloc.Cache/blob/main/docs/diagnostics/ZC0010.md) | Error | An interface whose name differs only in case from another's — only the first is generated |
+| [ZC0011](https://github.com/ZeroAlloc-Net/ZeroAlloc.Cache/blob/main/docs/diagnostics/ZC0011.md) | Warning | In a NativeAOT or trimmed project, a `HybridCache` method caches a type other than `string` or `byte[]` and no `IHybridCacheSerializer<T>` exists for it — `HybridCache`'s default serializer throws on the first miss |
 
 ---
 

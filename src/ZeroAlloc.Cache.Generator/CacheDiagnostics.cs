@@ -113,4 +113,18 @@ internal static class CacheDiagnostics
         category: Category,
         defaultSeverity: DiagnosticSeverity.Error,
         isEnabledByDefault: true);
+
+    /// <summary>
+    /// Under NativeAOT or trimming, HybridCache's default serializer handles only string and
+    /// byte[]; every other value type goes to reflection-based System.Text.Json, which throws on
+    /// the first miss. Reported only while the compilation has no serializer for the type. See #223.
+    /// </summary>
+    public static readonly DiagnosticDescriptor HybridValueNeedsSerializer = new(
+        id: "ZC0011",
+        title: "HybridCache value type needs an AOT-safe serializer",
+        messageFormat: "Method '{0}' caches '{1}' in HybridCache, whose default serializer uses reflection-based System.Text.Json and throws under NativeAOT and trimming. Register an IHybridCacheSerializer<{1}> backed by a source-generated JsonTypeInfo. See https://github.com/ZeroAlloc-Net/ZeroAlloc.Cache/blob/main/docs/diagnostics/ZC0011.md for an example.",
+        category: Category,
+        defaultSeverity: DiagnosticSeverity.Warning,
+        isEnabledByDefault: true,
+        helpLinkUri: "https://github.com/ZeroAlloc-Net/ZeroAlloc.Cache/blob/main/docs/diagnostics/ZC0011.md");
 }
