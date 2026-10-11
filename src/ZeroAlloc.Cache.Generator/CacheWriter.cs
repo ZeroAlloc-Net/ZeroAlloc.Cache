@@ -381,9 +381,10 @@ internal static class CacheWriter
     // The hit path reads the entry as object and tests it against the concrete return type.
     // It must not call the generic CacheExtensions.TryGetValue<TItem>: for a value-type return
     // TItem is Nullable<T>, and its `result is TItem` test never returns under NativeAOT unless
-    // something else in the app happens to use Nullable<T>. That is an upstream runtime bug,
-    // so this shape is a mitigation, not a simplification target: keep it until the runtime
-    // fix ships. See https://github.com/ZeroAlloc-Net/ZeroAlloc.Cache/issues/182.
+    // something else in the app happens to use Nullable<T>. That is an ILCompiler bug, fixed in
+    // .NET 11 by dotnet/runtime#134823 and not backported to .NET 10. Once this repo targets
+    // net11.0, the generic call can return under #if NET11_0_OR_GREATER, with this shape kept
+    // for earlier frameworks. See https://github.com/ZeroAlloc-Net/ZeroAlloc.Cache/issues/182.
     // Unboxing a value type does not allocate, so this adds no allocation to the hit path.
     // A stored null is a hit for a nullable return, as it was with TryGetValue<TItem>.
     private static (string Condition, string Return) BuildCacheHit(CachedMethodModel m)
