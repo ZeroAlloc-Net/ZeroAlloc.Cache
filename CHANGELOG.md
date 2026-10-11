@@ -4,6 +4,13 @@ All notable changes to this project are documented here. The format is based on
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the project follows
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.1.62](https://github.com/ZeroAlloc-Net/ZeroAlloc.Cache/compare/v1.1.61...v1.1.62) (2026-10-11)
+
+
+### Documentation
+
+* record the .NET 11 plan for the value-type cache hit path ([#221](https://github.com/ZeroAlloc-Net/ZeroAlloc.Cache/issues/221)) ([1529e8f](https://github.com/ZeroAlloc-Net/ZeroAlloc.Cache/commit/1529e8f1925d41299c9ee24fd1da4f4c850c63e0)), closes [#182](https://github.com/ZeroAlloc-Net/ZeroAlloc.Cache/issues/182)
+
 ## [1.1.61](https://github.com/ZeroAlloc-Net/ZeroAlloc.Cache/compare/v1.1.60...v1.1.61) (2026-10-10)
 
 
