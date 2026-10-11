@@ -117,6 +117,37 @@ await using (staffProvider.ConfigureAwait(false))
         return Fail($"Nested interface: expected a cache hit, CallCount is {people.CallCount}");
 }
 
+// UseHybridCache methods through the generated DI extension, which registers HybridCache. Two
+// separately resolved proxies share the container's HybridCache, so the second call is a hit.
+var priceServices = new ServiceCollection();
+priceServices.AddSingleton<PriceCallLog>();
+priceServices.AddPriceServiceCache<PriceService>();
+var priceProvider = priceServices.BuildServiceProvider();
+await using (priceProvider.ConfigureAwait(false))
+{
+    var priceLog = priceProvider.GetRequiredService<PriceCallLog>();
+    var pricesA = priceProvider.GetRequiredService<IPriceService>();
+    var pricesB = priceProvider.GetRequiredService<IPriceService>();
+
+    var l1 = await WithinTimeLimit("hybrid GetLabelAsync call 1", () => pricesA.GetLabelAsync(4, CancellationToken.None).AsTask()).ConfigureAwait(false);
+    var l2 = await WithinTimeLimit("hybrid GetLabelAsync call 2", () => pricesB.GetLabelAsync(4, CancellationToken.None).AsTask()).ConfigureAwait(false);
+    if (!string.Equals(l1, "label-4", StringComparison.Ordinal) || !string.Equals(l2, l1, StringComparison.Ordinal))
+        return Fail($"Hybrid string method returned '{l1}' and '{l2}'");
+    if (priceLog.LabelCalls != 1)
+        return Fail($"Hybrid string method: expected a cache hit, LabelCalls is {priceLog.LabelCalls}");
+
+    var p1 = await WithinTimeLimit("hybrid GetPriceAsync call 1", () => pricesA.GetPriceAsync(4, CancellationToken.None).AsTask()).ConfigureAwait(false);
+    var p2 = await WithinTimeLimit("hybrid GetPriceAsync call 2", () => pricesB.GetPriceAsync(4, CancellationToken.None).AsTask()).ConfigureAwait(false);
+    if (p1 != 400 || p2 != 400)
+        return Fail($"Hybrid ValueTask<int> method returned {p1} and {p2}");
+    if (priceLog.PriceCalls != 1)
+        return Fail($"Hybrid ValueTask<int> method: expected a cache hit, PriceCalls is {priceLog.PriceCalls}");
+
+    var p3 = await WithinTimeLimit("hybrid GetPriceAsync other key", () => pricesA.GetPriceAsync(5, CancellationToken.None).AsTask()).ConfigureAwait(false);
+    if (p3 != 500 || priceLog.PriceCalls != 2)
+        return Fail($"Hybrid different key: expected 500 from a second inner call, got {p3} after {priceLog.PriceCalls}");
+}
+
 Console.WriteLine("AOT smoke: PASS");
 return 0;
 
@@ -131,7 +162,7 @@ static async Task<T> WithinTimeLimit<T>(string what, Func<Task<T>> call)
     }
     catch (TimeoutException)
     {
-        Fail($"{what} did not return within {limit.TotalSeconds} seconds, a value-type cache hit hang, see #182");
+        Fail($"{what} did not return within {limit.TotalSeconds} seconds, a hang; see #182 for the value-type hit case");
         Environment.Exit(1);
         throw;
     }
