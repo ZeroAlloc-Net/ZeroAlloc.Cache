@@ -4,6 +4,23 @@ All notable changes to this project are documented here. The format is based on
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the project follows
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.2.0](https://github.com/ZeroAlloc-Net/ZeroAlloc.Cache/compare/v1.1.62...v1.2.0) (2026-10-11)
+
+
+### Features
+
+* report ZC0011 when a HybridCache value type has no AOT-safe serializer ([f74f7dd](https://github.com/ZeroAlloc-Net/ZeroAlloc.Cache/commit/f74f7dd07da4205e4adc3095529353cee4b1ecbf))
+
+
+### Bug Fixes
+
+* compile a HybridCache method that takes no parameters ([f74f7dd](https://github.com/ZeroAlloc-Net/ZeroAlloc.Cache/commit/f74f7dd07da4205e4adc3095529353cee4b1ecbf))
+
+
+### Tests
+
+* run the HybridCache proxy in the AOT smoke with a source-generated serializer ([f74f7dd](https://github.com/ZeroAlloc-Net/ZeroAlloc.Cache/commit/f74f7dd07da4205e4adc3095529353cee4b1ecbf))
+
 ## [1.1.62](https://github.com/ZeroAlloc-Net/ZeroAlloc.Cache/compare/v1.1.61...v1.1.62) (2026-10-11)
 
 
