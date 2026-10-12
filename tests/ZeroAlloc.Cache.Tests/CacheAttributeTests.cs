@@ -37,7 +37,7 @@ public sealed class CacheAttributeTests
         var usage = typeof(CacheAttribute)
             .GetCustomAttributes(typeof(AttributeUsageAttribute), false)
             .Cast<AttributeUsageAttribute>()
-            .First();
+            .Single();
         (usage.ValidOn & AttributeTargets.Interface).Should().Be(AttributeTargets.Interface);
         (usage.ValidOn & AttributeTargets.Method).Should().Be(AttributeTargets.Method);
         usage.AllowMultiple.Should().BeFalse();

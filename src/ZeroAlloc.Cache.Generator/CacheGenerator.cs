@@ -533,9 +533,7 @@ public sealed class CacheGenerator : IIncrementalGenerator
                 method.Name));
         }
 
-#pragma warning disable HLQ012 // CollectionsMarshal.AsSpan not available on netstandard2.0
         foreach (var kp in keyParams)
-#pragma warning restore HLQ012
         {
             if (kp.IsReferenceType)
             {
