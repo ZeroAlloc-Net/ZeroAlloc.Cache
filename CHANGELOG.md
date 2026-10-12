@@ -4,6 +4,13 @@ All notable changes to this project are documented here. The format is based on
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the project follows
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.2.1](https://github.com/ZeroAlloc-Net/ZeroAlloc.Cache/compare/v1.2.0...v1.2.1) (2026-10-12)
+
+
+### Code Refactoring
+
+* remove NetFabric.Hyperlinq.Analyzer and its suppressions ([#227](https://github.com/ZeroAlloc-Net/ZeroAlloc.Cache/issues/227)) ([dc01bfa](https://github.com/ZeroAlloc-Net/ZeroAlloc.Cache/commit/dc01bfa00bcf5abe0e96474b9db708eaf026af66))
+
 ## [1.2.0](https://github.com/ZeroAlloc-Net/ZeroAlloc.Cache/compare/v1.1.62...v1.2.0) (2026-10-11)
 
 
