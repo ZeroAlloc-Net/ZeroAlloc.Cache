@@ -4,6 +4,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Caching.Memory;
 using Microsoft.Extensions.DependencyInjection;
+using ZeroAlloc.TestHelpers;
 
 namespace ZeroAlloc.Cache.Tests;
 
@@ -14,14 +15,19 @@ namespace ZeroAlloc.Cache.Tests;
 /// </summary>
 /// <remarks>
 /// Serialised with the telemetry tests, whose activity and meter listeners make every call
-/// allocate. Tiered compilation runs a method unoptimised first, and that code boxes value types
-/// while formatting the key, so each case repeats a window of hits until one reads zero, and fails
-/// only if none does within the time limit. A real allocation never reads zero.
+/// allocate. Each case measures the whole proxy call with <see cref="AllocationGate"/>, which
+/// settles the heap, warms up, and fails on any allocation: its per-call figure rounds up.
+/// <para>
+/// Tiered compilation runs a method unoptimised first. That code boxes value-type key parameters
+/// while formatting the key, 104 B per <c>ByValuesAsync</c> hit, and the gate's two warmup calls do
+/// not reach optimised code. So each case repeats the gate's measurement until a window reads zero
+/// or <see cref="Limit"/> passes, then asserts with the gate. A real allocation never reads zero.
+/// </para>
 /// </remarks>
 [Collection("cache-telemetry-non-parallel")]
 public sealed class HitAllocationTests : IDisposable
 {
-    private const int Window = 1_000;
+    private const int Iterations = 1_000;
     private static readonly TimeSpan Limit = TimeSpan.FromSeconds(10);
 
     private readonly MemoryCache _cache = new(new MemoryCacheOptions());
@@ -33,7 +39,7 @@ public sealed class HitAllocationTests : IDisposable
     {
         var proxy = new ITestServiceCacheProxy(new TestServiceImpl(), _cache);
 
-        SteadyStateAllocation(() => proxy.GetAsync("abc", CancellationToken.None), "result-abc").Should().Be(0);
+        AssertHitAllocatesNothing(() => proxy.GetAsync("abc", CancellationToken.None), "result-abc", "GetAsync");
     }
 
     [Fact]
@@ -41,9 +47,9 @@ public sealed class HitAllocationTests : IDisposable
     {
         var proxy = new IValueTypeServiceCacheProxy(new ValueTypeServiceImpl(), _cache);
 
-        SteadyStateAllocation(() => proxy.CountAsync("abc", CancellationToken.None), 1).Should().Be(0);
-        SteadyStateAllocation(() => proxy.MaybeCountAsync("abc", CancellationToken.None), 1).Should().Be(0);
-        SteadyStateAllocation(() => proxy.MaybeTotalAsync("abc", CancellationToken.None), new Money(1)).Should().Be(0);
+        AssertHitAllocatesNothing(() => proxy.CountAsync("abc", CancellationToken.None), 1, "CountAsync");
+        AssertHitAllocatesNothing(() => proxy.MaybeCountAsync("abc", CancellationToken.None), 1, "MaybeCountAsync");
+        AssertHitAllocatesNothing(() => proxy.MaybeTotalAsync("abc", CancellationToken.None), new Money(1), "MaybeTotalAsync");
     }
 
     [Fact]
@@ -53,8 +59,8 @@ public sealed class HitAllocationTests : IDisposable
         var guid = Guid.NewGuid();
         var date = DateTime.UtcNow;
 
-        SteadyStateAllocation(() => proxy.ByValuesAsync(7, 8L, guid, date, 1.5, CancellationToken.None), "inner-1").Should().Be(0);
-        SteadyStateAllocation(() => proxy.ByKindAsync(KeyKind.Second, CancellationToken.None), "inner-2").Should().Be(0);
+        AssertHitAllocatesNothing(() => proxy.ByValuesAsync(7, 8L, guid, date, 1.5, CancellationToken.None), "inner-1", "ByValuesAsync");
+        AssertHitAllocatesNothing(() => proxy.ByKindAsync(KeyKind.Second, CancellationToken.None), "inner-2", "ByKindAsync");
     }
 
     [Fact]
@@ -63,7 +69,7 @@ public sealed class HitAllocationTests : IDisposable
         using var holder = new IBoundedServiceBoundedCache();
         var proxy = new IBoundedServiceCacheProxy(new BoundedServiceImpl(new CallLog()), holder);
 
-        SteadyStateAllocation(() => proxy.GetAsync("abc", CancellationToken.None), "bounded-abc").Should().Be(0);
+        AssertHitAllocatesNothing(() => proxy.GetAsync("abc", CancellationToken.None), "bounded-abc", "bounded GetAsync");
     }
 
     // AddMemoryCache registers a plain MemoryCache, so a proxy resolved from DI takes the span lookup.
@@ -75,7 +81,7 @@ public sealed class HitAllocationTests : IDisposable
         using var provider = services.BuildServiceProvider();
         var proxy = provider.GetRequiredService<ITestService>();
 
-        SteadyStateAllocation(() => proxy.GetAsync("abc", CancellationToken.None), "result-abc").Should().Be(0);
+        AssertHitAllocatesNothing(() => proxy.GetAsync("abc", CancellationToken.None), "result-abc", "DI-resolved GetAsync");
     }
 
     // Proves the gate sees an allocation: any other IMemoryCache takes the string key lookup,
@@ -87,31 +93,22 @@ public sealed class HitAllocationTests : IDisposable
         var proxy = new ITestServiceCacheProxy(new TestServiceImpl(), decorator);
         Complete(proxy.GetAsync("abc", CancellationToken.None));
 
-        MeasureWindow(() => proxy.GetAsync("abc", CancellationToken.None)).Should().BeGreaterThan(0);
+        AllocationGate.MeasureBytesPerCallValueTask(Iterations, () => proxy.GetAsync("abc", CancellationToken.None))
+            .Should().BeGreaterThan(0);
     }
 
-    // Bytes allocated over one window of hits, once a window reads zero or the limit passes.
-    private static long SteadyStateAllocation<T>(Func<ValueTask<T>> hit, T expected)
+    private static void AssertHitAllocatesNothing<T>(Func<ValueTask<T>> hit, T expected, string label)
     {
         Complete(hit()); // the miss that stores the entry
         Complete(hit()).Should().Be(expected, "the second call must be a hit on the stored entry");
 
         var deadline = Stopwatch.GetTimestamp() + (long)(Limit.TotalSeconds * Stopwatch.Frequency);
-        long bytes;
-        do
+        while (AllocationGate.MeasureBytesPerCallValueTask(Iterations, hit) != 0 && Stopwatch.GetTimestamp() < deadline)
         {
-            bytes = MeasureWindow(hit);
+            // Unoptimised code still runs; measure again once the JIT has tiered it up.
         }
-        while (bytes != 0 && Stopwatch.GetTimestamp() < deadline);
-        return bytes;
-    }
 
-    private static long MeasureWindow<T>(Func<ValueTask<T>> hit)
-    {
-        long before = GC.GetAllocatedBytesForCurrentThread();
-        for (int i = 0; i < Window; i++)
-            _ = Complete(hit());
-        return GC.GetAllocatedBytesForCurrentThread() - before;
+        AllocationGate.AssertBudgetValueTask(0, Iterations, hit, label);
     }
 
     // Every call here completes synchronously; the inner services return completed ValueTasks.
