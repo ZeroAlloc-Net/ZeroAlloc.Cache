@@ -576,6 +576,11 @@ All notable changes to this project are documented here. The format is based on
 
 * **cache:** Meter name renamed from "zeroalloc.cache" to "ZeroAlloc.Cache" for ecosystem consistency with the other ZeroAlloc telemetry packages. Subscribers calling AddMeter("zeroalloc.cache") must update to AddMeter("ZeroAlloc.Cache"); they will silently stop receiving metrics otherwise (no error or warning at runtime).
 
+  ```diff
+  -services.AddOpenTelemetry().WithMetrics(m => m.AddMeter("zeroalloc.cache"));
+  +services.AddOpenTelemetry().WithMetrics(m => m.AddMeter("ZeroAlloc.Cache"));
+  ```
+
 ### Features
 
 * add CacheAttribute with TtlMs, Sliding, MaxEntries, UseHybridCache ([32c97ed](https://github.com/ZeroAlloc-Net/ZeroAlloc.Cache/commit/32c97ed110ff8593e88b345715c3d398424a30a1))
@@ -593,6 +598,7 @@ All notable changes to this project are documented here. The format is based on
 
 ### Bug Fixes
 
+* the generated DI extension for `[Cache(UseHybridCache = true)]` interfaces emits `using Microsoft.Extensions.Caching.Hybrid;`, so `services.AddHybridCache()` resolves in consumers that do not import that namespace
 * correct package versions, add Version/Description, suppress RS2008 in generator ([aa12efb](https://github.com/ZeroAlloc-Net/ZeroAlloc.Cache/commit/aa12efbc0fce86ba0e5a479e57339f6614eef76e))
 * defensive TtlMs guard, IsolatedCacheMaxEntries comment, sliding+maxentries snapshot ([c267dc4](https://github.com/ZeroAlloc-Net/ZeroAlloc.Cache/commit/c267dc4dd16e3a0d37257ebac5009177de14c9b6))
 * explicit tuple labels and zero-param HybridCache snapshot (Task 8) ([7a07e28](https://github.com/ZeroAlloc-Net/ZeroAlloc.Cache/commit/7a07e28bf9c6977d99132e52d9bff39431060d2d))
@@ -683,38 +689,3 @@ All notable changes to this project are documented here. The format is based on
 * initial ZeroAlloc.Cache project scaffold ([a48b840](https://github.com/ZeroAlloc-Net/ZeroAlloc.Cache/commit/a48b8403082e32cacca9e5e74243703f21b9163f))
 * pin .NET SDK to 10.0.202 ([53ba061](https://github.com/ZeroAlloc-Net/ZeroAlloc.Cache/commit/53ba06123a777b644393d6ba93be5d7fa190e0f9))
 * update renovate config to org standard ([1ab8306](https://github.com/ZeroAlloc-Net/ZeroAlloc.Cache/commit/1ab8306cb23235ecdeed9a4eabd1c47406a0747d))
-
-## 2.0.0
-
-### Breaking changes
-
-- **`Meter` name renamed** from `"zeroalloc.cache"` to `"ZeroAlloc.Cache"` for
-  ecosystem consistency with the other ZeroAlloc telemetry packages. Subscribers
-  must update their `AddMeter(...)` calls:
-  ```diff
-  -services.AddOpenTelemetry().WithMetrics(m => m.AddMeter("zeroalloc.cache"));
-  +services.AddOpenTelemetry().WithMetrics(m => m.AddMeter("ZeroAlloc.Cache"));
-  ```
-  No error or warning is raised at runtime; the only symptom is that metrics
-  silently stop being delivered to the subscriber.
-
-### Added
-
-- `cache.lookup` span emitted per cached method via
-  `ActivitySource("ZeroAlloc.Cache")`. Tags: `cache.method`
-  (`"Interface.Method"` compile-time constant), `cache.tier` (`"L1"` or
-  `"L2"`), and `cache.hit` (`true`/`false`, L1 path only — `HybridCache`
-  hides per-call hit/miss state, so the tag is omitted on the L2 path).
-- `cache.lookup_duration_ms` `Histogram<double>` on the existing Meter,
-  tagged with `cache.method`. Recorded on every exit path (hit, miss, L2,
-  exception).
-- Existing counters (`cache.hits`, `cache.misses`, `cache.evictions`,
-  `cache.hybrid_calls`) — emitted by the source generator with no extra
-  package dependency, using only BCL `System.Diagnostics.Metrics`.
-
-### Fixed
-
-- Generated DI extension method for `[Cache(UseHybridCache = true)]` interfaces
-  now emits `using Microsoft.Extensions.Caching.Hybrid;` so the
-  `services.AddHybridCache()` extension method resolves in consumers that
-  don't already pull that namespace transitively.
