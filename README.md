@@ -2,7 +2,7 @@
 
 [![NuGet](https://img.shields.io/nuget/v/ZeroAlloc.Cache.svg)](https://www.nuget.org/packages/ZeroAlloc.Cache)
 [![Build](https://github.com/ZeroAlloc-Net/ZeroAlloc.Cache/actions/workflows/ci.yml/badge.svg)](https://github.com/ZeroAlloc-Net/ZeroAlloc.Cache/actions/workflows/ci.yml)
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://github.com/ZeroAlloc-Net/ZeroAlloc.Cache/blob/main/LICENSE)
 [![AOT](https://img.shields.io/badge/AOT--Compatible-passing-brightgreen)](https://learn.microsoft.com/dotnet/core/deploying/native-aot/)
 [![GitHub Sponsors](https://img.shields.io/github/sponsors/MarcelRoozekrans?style=flat&logo=githubsponsors&color=ea4aaa&label=Sponsor)](https://github.com/sponsors/MarcelRoozekrans)
 
@@ -96,13 +96,6 @@ cache.Remove($"IProductRepository.GetByIdAsync:{id}");
 
 Each cached method emits both metrics (via `Meter("ZeroAlloc.Cache")`) and a tracing span (via `ActivitySource("ZeroAlloc.Cache")`) — no extra package required, plain BCL `System.Diagnostics`.
 
-> **Breaking change in 2.0:** `Meter` name renamed from `"zeroalloc.cache"` to `"ZeroAlloc.Cache"` for ecosystem consistency with the other ZeroAlloc telemetry packages. Subscribers must update — calls to `AddMeter("zeroalloc.cache")` will silently stop receiving metrics:
->
-> ```diff
-> -services.AddOpenTelemetry().WithMetrics(m => m.AddMeter("zeroalloc.cache"));
-> +services.AddOpenTelemetry().WithMetrics(m => m.AddMeter("ZeroAlloc.Cache"));
-> ```
-
 **Metrics.** Counters tagged with `method` (the cached method name): `cache.hits`, `cache.misses`, `cache.evictions`, `cache.hybrid_calls` (factory invocations on the HybridCache path). The `cache.lookup_duration_ms` histogram records per-lookup latency tagged with `cache.method`.
 
 **Tracing.** Each cached method emits a `cache.lookup` span tagged with:
@@ -147,7 +140,7 @@ Full docs live in [`docs/`](https://github.com/ZeroAlloc-Net/ZeroAlloc.Cache/blo
 
 - [Getting Started](https://github.com/ZeroAlloc-Net/ZeroAlloc.Cache/blob/main/docs/getting-started.md)
 - [Attribute Reference](https://github.com/ZeroAlloc-Net/ZeroAlloc.Cache/blob/main/docs/attributes.md)
-- Diagnostics: [ZC0001](https://github.com/ZeroAlloc-Net/ZeroAlloc.Cache/blob/main/docs/diagnostics/ZC0001.md) · [ZC0002](https://github.com/ZeroAlloc-Net/ZeroAlloc.Cache/blob/main/docs/diagnostics/ZC0002.md) · [ZC0003](https://github.com/ZeroAlloc-Net/ZeroAlloc.Cache/blob/main/docs/diagnostics/ZC0003.md) · [ZC0004](https://github.com/ZeroAlloc-Net/ZeroAlloc.Cache/blob/main/docs/diagnostics/ZC0004.md) · [ZC0005](https://github.com/ZeroAlloc-Net/ZeroAlloc.Cache/blob/main/docs/diagnostics/ZC0005.md) · [ZC0006](https://github.com/ZeroAlloc-Net/ZeroAlloc.Cache/blob/main/docs/diagnostics/ZC0006.md) · [ZC0007](https://github.com/ZeroAlloc-Net/ZeroAlloc.Cache/blob/main/docs/diagnostics/ZC0007.md) · [ZC0008](https://github.com/ZeroAlloc-Net/ZeroAlloc.Cache/blob/main/docs/diagnostics/ZC0008.md) · [ZC0009](https://github.com/ZeroAlloc-Net/ZeroAlloc.Cache/blob/main/docs/diagnostics/ZC0009.md) · [ZC0010](https://github.com/ZeroAlloc-Net/ZeroAlloc.Cache/blob/main/docs/diagnostics/ZC0010.md)
+- Diagnostics: [ZC0001](https://github.com/ZeroAlloc-Net/ZeroAlloc.Cache/blob/main/docs/diagnostics/ZC0001.md) · [ZC0002](https://github.com/ZeroAlloc-Net/ZeroAlloc.Cache/blob/main/docs/diagnostics/ZC0002.md) · [ZC0003](https://github.com/ZeroAlloc-Net/ZeroAlloc.Cache/blob/main/docs/diagnostics/ZC0003.md) · [ZC0004](https://github.com/ZeroAlloc-Net/ZeroAlloc.Cache/blob/main/docs/diagnostics/ZC0004.md) · [ZC0005](https://github.com/ZeroAlloc-Net/ZeroAlloc.Cache/blob/main/docs/diagnostics/ZC0005.md) · [ZC0006](https://github.com/ZeroAlloc-Net/ZeroAlloc.Cache/blob/main/docs/diagnostics/ZC0006.md) · [ZC0007](https://github.com/ZeroAlloc-Net/ZeroAlloc.Cache/blob/main/docs/diagnostics/ZC0007.md) · [ZC0008](https://github.com/ZeroAlloc-Net/ZeroAlloc.Cache/blob/main/docs/diagnostics/ZC0008.md) · [ZC0009](https://github.com/ZeroAlloc-Net/ZeroAlloc.Cache/blob/main/docs/diagnostics/ZC0009.md) · [ZC0010](https://github.com/ZeroAlloc-Net/ZeroAlloc.Cache/blob/main/docs/diagnostics/ZC0010.md) · [ZC0011](https://github.com/ZeroAlloc-Net/ZeroAlloc.Cache/blob/main/docs/diagnostics/ZC0011.md)
 
 ---
 
