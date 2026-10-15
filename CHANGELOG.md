@@ -4,6 +4,18 @@ All notable changes to this project are documented here. The format is based on
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the project follows
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.2.3](https://github.com/ZeroAlloc-Net/ZeroAlloc.Cache/compare/v1.2.2...v1.2.3) (2026-10-15)
+
+
+### Documentation
+
+* remove the false 2.0 breaking-change note ([#234](https://github.com/ZeroAlloc-Net/ZeroAlloc.Cache/issues/234)) ([4f86bb2](https://github.com/ZeroAlloc-Net/ZeroAlloc.Cache/commit/4f86bb29ad43d6dc4cf85c4a3154a4461bf1f51c))
+
+
+### Tests
+
+* gate cache-hit allocations with AllocationGate ([#236](https://github.com/ZeroAlloc-Net/ZeroAlloc.Cache/issues/236)) ([5b0f7b0](https://github.com/ZeroAlloc-Net/ZeroAlloc.Cache/commit/5b0f7b091c184af95c04277ad914ebebc74d1236)), closes [#233](https://github.com/ZeroAlloc-Net/ZeroAlloc.Cache/issues/233)
+
 ## [1.2.2](https://github.com/ZeroAlloc-Net/ZeroAlloc.Cache/compare/v1.2.1...v1.2.2) (2026-10-12)
 
 
