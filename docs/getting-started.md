@@ -81,6 +81,16 @@ public class ProductsController(IProductRepository repo)
 
 On a cache miss the inner `ProductRepositoryImpl` is called and the result is stored. On a cache hit the value is returned directly, without calling the inner implementation. For a `ValueTask<T>` method on the default `MemoryCache` on .NET 9 and later, the hit allocates nothing; [Performance](performance.md#where-a-hit-still-allocates) lists the cases that still allocate.
 
+### Cache keys
+
+Each entry is stored under the string `{Interface}.{Method}:{arg1}:{arg2}`, built from every parameter except the `CancellationToken`, each formatted with the current culture. A method without key parameters uses `{Interface}.{Method}`. To evict an entry from the shared `IMemoryCache`, remove it by that string:
+
+```csharp
+cache.Remove($"IProductRepository.GetByIdAsync:{id}");
+```
+
+`HybridCache` methods use the same key text. For an interface nested in another type, `{Interface}` starts with the containing types, as in `Catalog.IProductLookup.GetByIdAsync:42`. When two interfaces in the project would use the same `{Interface}`, such as `Shipping.IProductLookup` and `Billing.IProductLookup`, both start with their namespace instead, as in `Shipping.IProductLookup.GetByIdAsync:42`, so they never read each other's entries. Every other interface keeps the shorter text.
+
 ---
 
 ## 5. HybridCache opt-in
