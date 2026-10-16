@@ -4,6 +4,13 @@ All notable changes to this project are documented here. The format is based on
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the project follows
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.2.5](https://github.com/ZeroAlloc-Net/ZeroAlloc.Cache/compare/v1.2.4...v1.2.5) (2026-10-16)
+
+
+### Documentation
+
+* rewrite the readme as a product page ([#238](https://github.com/ZeroAlloc-Net/ZeroAlloc.Cache/issues/238)) ([a8b3930](https://github.com/ZeroAlloc-Net/ZeroAlloc.Cache/commit/a8b3930be81dab1474950642e9da38eb2e95f4f8))
+
 ## [1.2.4](https://github.com/ZeroAlloc-Net/ZeroAlloc.Cache/compare/v1.2.3...v1.2.4) (2026-10-15)
 
 
