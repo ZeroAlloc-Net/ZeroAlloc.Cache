@@ -12,7 +12,7 @@ Put `[Cache]` on an interface and a source generator writes the caching proxy fo
 ## Why ZeroAlloc.Cache
 
 - **0 B per cache hit.** A `ValueTask<T>` hit on the default `MemoryCache` on .NET 9 and later allocates nothing, and a test fails the build if it ever does. The few cases that still allocate are [listed](https://github.com/ZeroAlloc-Net/ZeroAlloc.Cache/blob/main/docs/performance.md#where-a-hit-still-allocates).
-- **About 6× faster than FusionCache** on an in-process cache hit, measured in the same run.
+- **About 4× faster than FusionCache** on an in-process cache hit, measured in the same run.
 - **Works under NativeAOT and trimming.** The proxy is plain generated code, published and run as a NativeAOT app in CI.
 - **Mistakes surface at compile time.** Unstable key parameters, a missing `HybridCache` package or a missing AOT serializer are compiler diagnostics, not production surprises.
 
@@ -65,15 +65,15 @@ public sealed class ProductCatalog : IProductCatalog
 
 ## Performance
 
-In-process cache hit. .NET 10.0.12, i9-12900HK, BenchmarkDotNet v0.15.8.
+In-process cache hit. .NET 10.0.13, BenchmarkDotNet v0.15.8, same run. Allocations are exact; speed is a same-run ratio against hand-written `IMemoryCache` code.
 
-| Library | Time | Allocated |
+| Library | Ratio | Allocated |
 |---|---:|---:|
-| Raw `IMemoryCache.GetOrCreateAsync` | 157 ns | 104 B |
-| **ZA.Cache proxy** | **198 ns** | **0 B** |
-| FusionCache | 1,270 ns | 88 B |
+| Raw `IMemoryCache.GetOrCreateAsync` | 1.00 | 104 B |
+| **ZA.Cache proxy** | **1.66** | **0 B** |
+| FusionCache | 6.88 | 88 B |
 
-ZA.Cache is about 6× faster than FusionCache and the only row that allocates nothing. Against hand-written `IMemoryCache` code it costs about 1.3× the time, for proxy dispatch, key formatting and telemetry, in exchange for no lookup code at any call site. Methodology and the full numbers: [docs/performance.md](https://github.com/ZeroAlloc-Net/ZeroAlloc.Cache/blob/main/docs/performance.md).
+ZA.Cache is about 4× faster than FusionCache and the only row that allocates nothing. Against hand-written `IMemoryCache` code it costs about 1.7× the time, for proxy dispatch, key formatting and telemetry, in exchange for no lookup code at any call site. Methodology and the full numbers: [docs/performance.md](https://github.com/ZeroAlloc-Net/ZeroAlloc.Cache/blob/main/docs/performance.md).
 
 ## Learn more
 

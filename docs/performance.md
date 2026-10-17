@@ -53,17 +53,28 @@ A hit allocates in these cases. `CachedLookupBenchmark` and the `HitAllocationTe
 ## Head-to-head vs Raw IMemoryCache and FusionCache
 
 <!-- BENCH:START -->
-_Last refreshed: 2026-09-30_
+_Last refreshed: 2026-10-17_
 
-L1 (in-process) cache-hit comparison. .NET 10.0.12, i9-12900HK, BenchmarkDotNet v0.15.8. ZA.Cache wraps `IMemoryCache`, so the relevant comparisons are: hand-rolled `GetOrCreateAsync` (the pattern ZA replaces) and [FusionCache](https://github.com/ZiggyCreatures/FusionCache) 2.9 (the de-facto third-party L1+L2 caching library). Each row returns the library's own task type directly, so no benchmark wrapper allocation is counted.
+L1 (in-process) cache-hit comparison. ZA.Cache wraps `IMemoryCache`, so the relevant comparisons are: hand-rolled `GetOrCreateAsync` (the pattern ZA replaces) and [FusionCache](https://github.com/ZiggyCreatures/FusionCache) 2.9 (the de-facto third-party L1+L2 caching library). Each row returns the library's own task type directly, so no benchmark wrapper allocation is counted.
 
-| Library | Time | Allocated |
-|---|---:|---:|
-| Raw `IMemoryCache.GetOrCreateAsync` | 157 ns | 104 B |
-| **ZA.Cache proxy** | **198 ns** | **0 B** |
-| FusionCache | 1,270 ns | 88 B |
+```
+BenchmarkDotNet v0.15.8, Windows 11 (10.0.26300.9711)
+12th Gen Intel Core i9-12900HK 2.50GHz, 1 CPU, 20 logical and 14 physical cores
+.NET SDK 10.0.402
+  [Host] : .NET 10.0.13 (10.0.13, 10.0.1326.50504), X64 RyuJIT x86-64-v3
+```
 
-**ZA.Cache is about 6× faster than FusionCache and the only row that allocates nothing.** The trade vs raw `IMemoryCache` is about 1.3× the time, the cost of the typed `[Cache]` abstraction: proxy dispatch, key formatting and telemetry. In exchange you don't write the cache-lookup boilerplate at every call site, and the key derivation is generated rather than hand-typed.
+> Allocations are exact. Speed is shown as same-run ratios; absolute timings are not published.
+
+Every benchmark ran out of process in three launches on an otherwise idle machine, pinned to two performance cores (`--affinity 20`). `Ratio` is each row's mean time relative to the baseline in the same run; `Launch range` is the lowest and highest ratio of the three launches.
+
+| Library | Ratio | Launch range | Allocated |
+|---|---:|---:|---:|
+| Raw `IMemoryCache.GetOrCreateAsync` | 1.00 | | 104 B |
+| **ZA.Cache proxy** | **1.66** | **1.61–1.68** | **0 B** |
+| FusionCache | 6.88 | 6.79–7.04 | 88 B |
+
+**ZA.Cache is about 4× faster than FusionCache and the only row that allocates nothing.** The trade vs raw `IMemoryCache` is about 1.7× the time, the cost of the typed `[Cache]` abstraction: proxy dispatch, key formatting and telemetry. In exchange you don't write the cache-lookup boilerplate at every call site, and the key derivation is generated rather than hand-typed.
 
 **FusionCache** is heavier because it carries L2-cache, stampede protection, and adaptive-caching infrastructure even when only L1 is configured. For pure L1, ZA is the lighter choice; FusionCache's value is the L2 + advanced features that ZA does not implement.
 
@@ -78,19 +89,23 @@ The [benchmarks/ZeroAlloc.Cache.Benchmarks](https://github.com/ZeroAlloc-Net/Zer
 - **Proxied (cache hit)**: the generated `ICustomerServiceCacheProxy` over a plain `MemoryCache`, pre-warmed so every measured call is a hit, for a `ValueTask<string>` and a `ValueTask<int>` method.
 - **Proxied, other IMemoryCache**: the same proxy over an `IMemoryCache` decorator, which takes the string key lookup.
 
-| Method | Time | Allocated |
-|---|---:|---:|
-| direct (no cache) | 0.8 ns | 0 B |
-| proxied (cache hit) | 195 ns | 0 B |
-| proxied value type (cache hit) | 203 ns | 0 B |
-| proxied, other IMemoryCache (cache hit, string key) | 240 ns | 88 B |
+The benchmark's own baseline is the direct call, which takes well under 1% of a cache hit, so the
+ratios below are taken against the proxied hit on a plain `MemoryCache` instead. Same run and
+method as the head-to-head above.
 
-.NET 10.0.12, i9-12900HK, BenchmarkDotNet v0.15.8. Every benchmark returns the proxy's `ValueTask` directly, because an async wrapper method would allocate a `Task<T>` of its own.
+| Method | Ratio | Launch range | Allocated |
+|---|---:|---:|---:|
+| direct (no cache) | 0.00 | | 0 B |
+| proxied (cache hit) | 1.00 | | 0 B |
+| proxied value type (cache hit) | 1.01 | 0.99–1.02 | 0 B |
+| proxied, other IMemoryCache (cache hit, string key) | 1.19 | 1.17–1.21 | 88 B |
+
+Every benchmark returns the proxy's `ValueTask` directly, because an async wrapper method would allocate a `Task<T>` of its own. Building the key string for a decorated `IMemoryCache` costs about a fifth more than the span lookup, on top of its 88 B.
 
 ### Run the benchmark
 
 ```bash
-dotnet run --project benchmarks/ZeroAlloc.Cache.Benchmarks -c Release -- --filter "*"
+dotnet run --project benchmarks/ZeroAlloc.Cache.Benchmarks -c Release -- --filter "*" --launchCount 3
 ```
 
 Results are written to `BenchmarkDotNet.Artifacts/results/`.
@@ -99,7 +114,7 @@ Results are written to `BenchmarkDotNet.Artifacts/results/`.
 
 - **Allocated column**: the direct and both proxied cache-hit rows must read `0 B`. The other-IMemoryCache row allocates the key string by design.
 - **The allocation gate**: `HitAllocationTests` in `tests/ZeroAlloc.Cache.Tests` runs with the test suite and fails the build when a hit on a plain `MemoryCache` allocates, for reference and value-type returns, span-formattable key parameters, the `MaxEntries` cache and a proxy resolved from DI.
-- **Time column**: the proxied rows should stay within a small constant of each other. Most of the time is the `MemoryCache` lookup and the telemetry calls, not the key.
+- **Ratios**: the proxied rows should stay within a small constant of each other. Most of the time is the `MemoryCache` lookup and the telemetry calls, not the key.
 
 ## Cache-miss path
 
