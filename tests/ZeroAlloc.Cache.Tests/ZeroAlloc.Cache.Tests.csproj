@@ -4,7 +4,7 @@
     <IsPackable>false</IsPackable>
   </PropertyGroup>
   <ItemGroup>
-    <PackageReference Include="ZeroAlloc.TestHelpers" Version="1.7.*">
+    <PackageReference Include="ZeroAlloc.TestHelpers" Version="1.7.3">
       <PrivateAssets>all</PrivateAssets>
       <IncludeAssets>contentfiles;build</IncludeAssets>
     </PackageReference>
