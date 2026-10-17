@@ -4,6 +4,19 @@ All notable changes to this project are documented here. The format is based on
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the project follows
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.2.6](https://github.com/ZeroAlloc-Net/ZeroAlloc.Cache/compare/v1.2.5...v1.2.6) (2026-10-17)
+
+
+### Documentation
+
+* re-run the benchmarks pinned, with three launches ([#249](https://github.com/ZeroAlloc-Net/ZeroAlloc.Cache/issues/249)) ([612f979](https://github.com/ZeroAlloc-Net/ZeroAlloc.Cache/commit/612f9790cda47216dbc9f9a57b948aaa46678e29))
+
+
+### Tests
+
+* drop the hit-allocation retry loop and require testhelpers 1.8.0 ([#247](https://github.com/ZeroAlloc-Net/ZeroAlloc.Cache/issues/247)) ([0bc2e65](https://github.com/ZeroAlloc-Net/ZeroAlloc.Cache/commit/0bc2e65cc39a1b9a059dfafc80878f5830c65f62))
+* require testhelpers 1.7.3 and correct the hit-allocation gate comment ([#245](https://github.com/ZeroAlloc-Net/ZeroAlloc.Cache/issues/245)) ([5b8765c](https://github.com/ZeroAlloc-Net/ZeroAlloc.Cache/commit/5b8765ceb2febc90fef8d472943adca779ea41a8))
+
 ## [1.2.5](https://github.com/ZeroAlloc-Net/ZeroAlloc.Cache/compare/v1.2.4...v1.2.5) (2026-10-16)
 
 
