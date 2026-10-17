@@ -1,5 +1,4 @@
 using System;
-using System.Diagnostics;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Caching.Memory;
@@ -16,22 +15,19 @@ namespace ZeroAlloc.Cache.Tests;
 /// <remarks>
 /// Serialised with the telemetry tests, whose activity and meter listeners make every call
 /// allocate. Each case measures the whole proxy call with <see cref="AllocationGate"/>, which
-/// settles the heap, makes 2,000 warmup calls, measures three windows and keeps the least, and
-/// fails on any allocation: its per-call figure rounds up.
+/// settles the heap, makes 2,000 warmup calls, then measures windows until two agree and keeps the
+/// least, and fails on any allocation: its per-call figure rounds up.
 /// <para>
 /// Tiered compilation runs a method unoptimised first. That code boxes value-type key parameters
-/// while formatting the key, 104 B per <c>ByValuesAsync</c> hit. The JIT compiles the optimised
-/// code on a background thread and installs it some time later, not after a number of calls. The
-/// gate's warmup and windows take a few milliseconds, all of it before then, so all three windows
-/// read 104 B. So each case repeats the gate's measurement until a window reads zero or
-/// <see cref="Limit"/> passes, then asserts with the gate. A real allocation never reads zero.
+/// while formatting the key, 104 B per <c>ByValuesAsync</c> hit, and the optimised code installed
+/// later does not. Since TestHelpers 1.8.0 the gate does not fail a budget on such windows until
+/// tiered compilation has settled, so these cases need no retry loop of their own.
 /// </para>
 /// </remarks>
 [Collection("cache-telemetry-non-parallel")]
 public sealed class HitAllocationTests : IDisposable
 {
     private const int Iterations = 1_000;
-    private static readonly TimeSpan Limit = TimeSpan.FromSeconds(10);
 
     private readonly MemoryCache _cache = new(new MemoryCacheOptions());
 
@@ -104,12 +100,6 @@ public sealed class HitAllocationTests : IDisposable
     {
         Complete(hit()); // the miss that stores the entry
         Complete(hit()).Should().Be(expected, "the second call must be a hit on the stored entry");
-
-        var deadline = Stopwatch.GetTimestamp() + (long)(Limit.TotalSeconds * Stopwatch.Frequency);
-        while (AllocationGate.MeasureBytesPerCallValueTask(Iterations, hit) != 0 && Stopwatch.GetTimestamp() < deadline)
-        {
-            // Unoptimised code still runs; measure again once the JIT has tiered it up.
-        }
 
         AllocationGate.AssertBudgetValueTask(0, Iterations, hit, label);
     }
