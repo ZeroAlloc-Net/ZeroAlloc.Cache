@@ -16,12 +16,15 @@ namespace ZeroAlloc.Cache.Tests;
 /// <remarks>
 /// Serialised with the telemetry tests, whose activity and meter listeners make every call
 /// allocate. Each case measures the whole proxy call with <see cref="AllocationGate"/>, which
-/// settles the heap, warms up, and fails on any allocation: its per-call figure rounds up.
+/// settles the heap, makes 2,000 warmup calls, measures three windows and keeps the least, and
+/// fails on any allocation: its per-call figure rounds up.
 /// <para>
 /// Tiered compilation runs a method unoptimised first. That code boxes value-type key parameters
-/// while formatting the key, 104 B per <c>ByValuesAsync</c> hit, and the gate's two warmup calls do
-/// not reach optimised code. So each case repeats the gate's measurement until a window reads zero
-/// or <see cref="Limit"/> passes, then asserts with the gate. A real allocation never reads zero.
+/// while formatting the key, 104 B per <c>ByValuesAsync</c> hit. The JIT compiles the optimised
+/// code on a background thread and installs it some time later, not after a number of calls. The
+/// gate's warmup and windows take a few milliseconds, all of it before then, so all three windows
+/// read 104 B. So each case repeats the gate's measurement until a window reads zero or
+/// <see cref="Limit"/> passes, then asserts with the gate. A real allocation never reads zero.
 /// </para>
 /// </remarks>
 [Collection("cache-telemetry-non-parallel")]
