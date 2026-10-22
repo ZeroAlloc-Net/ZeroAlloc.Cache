@@ -4,6 +4,13 @@ All notable changes to this project are documented here. The format is based on
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the project follows
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.2.9](https://github.com/ZeroAlloc-Net/ZeroAlloc.Cache/compare/v1.2.8...v1.2.9) (2026-10-22)
+
+
+### Chores
+
+* **deps:** update codecov/codecov-action action to v7 ([#256](https://github.com/ZeroAlloc-Net/ZeroAlloc.Cache/issues/256)) ([18c4763](https://github.com/ZeroAlloc-Net/ZeroAlloc.Cache/commit/18c476342c3c0e5da010f1d1f8a8d5afc3fb5c39))
+
 ## [1.2.8](https://github.com/ZeroAlloc-Net/ZeroAlloc.Cache/compare/v1.2.7...v1.2.8) (2026-10-20)
 
 
