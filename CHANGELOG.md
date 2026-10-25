@@ -4,6 +4,13 @@ All notable changes to this project are documented here. The format is based on
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the project follows
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.2.11](https://github.com/ZeroAlloc-Net/ZeroAlloc.Cache/compare/v1.2.10...v1.2.11) (2026-10-25)
+
+
+### Chores
+
+* **deps:** update dependency zeroalloc.analyzers to 1.11.3 ([#260](https://github.com/ZeroAlloc-Net/ZeroAlloc.Cache/issues/260)) ([a7d7a96](https://github.com/ZeroAlloc-Net/ZeroAlloc.Cache/commit/a7d7a9645af5300f4285c848f18272d5d3d2b870))
+
 ## [1.2.10](https://github.com/ZeroAlloc-Net/ZeroAlloc.Cache/compare/v1.2.9...v1.2.10) (2026-10-24)
 
 
