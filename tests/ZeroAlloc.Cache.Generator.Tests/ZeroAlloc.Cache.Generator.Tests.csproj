@@ -15,7 +15,7 @@
     <PackageReference Include="AwesomeAssertions" Version="9.6.0" />
     <PackageReference Include="Microsoft.CodeAnalysis.CSharp" Version="5.9.0" />
     <PackageReference Include="Microsoft.Extensions.Caching.Hybrid" Version="10.11.0" />
-    <PackageReference Include="Microsoft.Extensions.Caching.Memory" Version="10.0.13" GeneratePathProperty="true" />
+    <PackageReference Include="Microsoft.Extensions.Caching.Memory" Version="10.0.14" GeneratePathProperty="true" />
     <ProjectReference Include="..\..\src\ZeroAlloc.Cache\ZeroAlloc.Cache.csproj" />
     <ProjectReference Include="..\..\src\ZeroAlloc.Cache.Generator\ZeroAlloc.Cache.Generator.csproj" />
   </ItemGroup>
