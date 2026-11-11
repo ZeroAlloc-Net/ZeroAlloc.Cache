@@ -4,6 +4,18 @@ All notable changes to this project are documented here. The format is based on
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the project follows
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.3.0](https://github.com/ZeroAlloc-Net/ZeroAlloc.Cache/compare/v1.2.18...v1.3.0) (2026-11-11)
+
+
+### Features
+
+* add net11.0 target ([#283](https://github.com/ZeroAlloc-Net/ZeroAlloc.Cache/issues/283)) ([5d80af0](https://github.com/ZeroAlloc-Net/ZeroAlloc.Cache/commit/5d80af08277e4926bf5b41cc1b8efcdcb8aaa52e))
+
+
+### Documentation
+
+* add context7.json to claim the library on Context7 ([#285](https://github.com/ZeroAlloc-Net/ZeroAlloc.Cache/issues/285)) ([f04501e](https://github.com/ZeroAlloc-Net/ZeroAlloc.Cache/commit/f04501e2642b047c619c4fcc2158bedf5d1902c4))
+
 ## [1.2.18](https://github.com/ZeroAlloc-Net/ZeroAlloc.Cache/compare/v1.2.17...v1.2.18) (2026-11-10)
 
 
