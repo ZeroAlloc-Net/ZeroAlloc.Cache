@@ -36,6 +36,10 @@ dotnet pack src/ZeroAlloc.Cache/ZeroAlloc.Cache.csproj -c Release -p:Version=$SE
 dotnet pack src/ZeroAlloc.Cache.Generator/ZeroAlloc.Cache.Generator.csproj -c Release -p:Version=$SEMVER --no-build -o ./artifacts
 ```
 
+The same job runs a coverage gate (`MarcelRoozekrans/ci-baseline/actions/coverage-gate`) on
+`TestResults/**/coverage.cobertura.xml` after the test step: line coverage of production code must stay at
+or above the floor. The commands above collect coverage but do not check the floor locally.
+
 CI job `aot-smoke` (needs `clang` and `zlib1g-dev`):
 
 ```bash
@@ -44,7 +48,16 @@ dotnet publish samples/ZeroAlloc.Cache.AotSmoke/ZeroAlloc.Cache.AotSmoke.csproj 
 timeout -k 5 30 ./aot-out/ZeroAlloc.Cache.AotSmoke
 ```
 
-The same job fails on any `IL` warning from outside `Microsoft.Extensions.Caching.Hybrid`.
+CI publishes with `2>&1 | tee publish.log` and then fails on any `IL` warning from outside
+`Microsoft.Extensions.Caching.Hybrid`. Run the filter on `publish.log` to reproduce it:
+
+```bash
+grep -E 'warning IL[0-9]{4}' publish.log \
+  | grep -vE 'Microsoft\.Extensions\.Caching\.Hybrid\.dll : warning IL(2104|3053):' \
+  | grep -vE 'warning IL2026: Microsoft\.Extensions\.Caching\.Hybrid\.'
+```
+
+Any output is a failure.
 
 Fast inner loop (verified, runs in about a minute, not a CI job on its own):
 
