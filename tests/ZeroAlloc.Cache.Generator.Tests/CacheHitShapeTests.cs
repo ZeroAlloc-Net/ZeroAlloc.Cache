@@ -44,12 +44,12 @@ public class CacheHitShapeTests
     [InlineData("ValueTask<string?>", "__boxed is null or string", "return (string?)__boxed;")]
     public void HitPath_TestsTheConcreteType(string returnType, string condition, string hitReturn)
     {
-        // net8.0: the string key lookup.
+        // net8.0 build of Microsoft.Extensions.Caching.Memory: the string key lookup.
         var stringKey = Generate(returnType, Unbounded, net8MemoryCache: true);
         stringKey.Should().Contain($"_cache.TryGetValue(__key, out object? __boxed) && {condition})");
         stringKey.Should().Contain(hitReturn);
 
-        // net9.0+: the span key lookup, #185, keeps the same concrete type test.
+        // Microsoft.Extensions.Caching.Memory 9.0+: the span key lookup, #185, keeps the same concrete type test.
         var spanKey = Generate(returnType, Unbounded, net8MemoryCache: false);
         spanKey.Should().Contain($"if (__found && {condition})");
         spanKey.Should().Contain(hitReturn);
@@ -79,8 +79,8 @@ public class CacheHitShapeTests
             .Where(method => method is { Name: "TryGetValue" })
             .ToList();
 
-        // Only the non-generic TryGetValue(object, out object?) and, on net9.0+, the non-generic
-        // MemoryCache.TryGetValue(ReadOnlySpan<char>, out object?) may be called.
+        // Only the non-generic TryGetValue(object, out object?) and, with Microsoft.Extensions.Caching.Memory
+        // 9.0+, the non-generic MemoryCache.TryGetValue(ReadOnlySpan<char>, out object?) may be called.
         calls.Should().NotBeEmpty();
         calls.Should().AllSatisfy(method =>
         {
