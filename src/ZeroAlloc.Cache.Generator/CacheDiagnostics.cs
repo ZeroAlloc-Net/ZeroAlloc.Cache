@@ -27,7 +27,7 @@ internal static class CacheDiagnostics
     public static readonly DiagnosticDescriptor HybridCacheNotAvailable = new(
         id: "ZC0003",
         title: "HybridCache not available",
-        messageFormat: "UseHybridCache = true requires Microsoft.Extensions.Caching.Hybrid (net9.0+). Add a package reference or target net9.0 or later.",
+        messageFormat: "UseHybridCache = true requires Microsoft.Extensions.Caching.Hybrid. Add a package reference to it.",
         category: Category,
         defaultSeverity: DiagnosticSeverity.Error,
         isEnabledByDefault: true

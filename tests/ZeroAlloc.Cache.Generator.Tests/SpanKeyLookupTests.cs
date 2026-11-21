@@ -11,7 +11,8 @@ namespace ZeroAlloc.Cache.Generator.Tests;
 /// #185: on a cache hit the generated proxy formats the key into a stack buffer and looks it up
 /// with <c>MemoryCache.TryGetValue(ReadOnlySpan&lt;char&gt;, out object?)</c>, so the hit allocates no
 /// key string. The key text stays exactly what it was, because users read and evict entries by
-/// it. The generator only takes that path when the API exists; net8.0 keeps the string lookup.
+/// it. The generator takes that path from C# 10 on, which formats the key with an interpolated string
+/// handler; below C# 10 the proxy keeps the string lookup.
 /// </summary>
 public class SpanKeyLookupTests
 {
@@ -35,11 +36,11 @@ public class SpanKeyLookupTests
         }
         """;
 
-    private static string Generate(string source, bool net8MemoryCache = false) =>
-        string.Join("\n", TestHelper.GetGeneratedSources(source, net8MemoryCache));
+    private static string Generate(string source, LanguageVersion languageVersion = LanguageVersion.Latest) =>
+        string.Join("\n", TestHelper.GetGeneratedSources(source, languageVersion));
 
     [Fact]
-    public void Net9Plus_SharedCache_LooksUpBySpanOnlyWhenTheCacheIsExactlyMemoryCache()
+    public void SpanLookup_SharedCache_LooksUpBySpanOnlyWhenTheCacheIsExactlyMemoryCache()
     {
         var generated = Generate(SharedAndBounded);
 
@@ -50,7 +51,7 @@ public class SpanKeyLookupTests
     }
 
     [Fact]
-    public void Net9Plus_BoundedCache_AlwaysLooksUpBySpan()
+    public void SpanLookup_BoundedCache_AlwaysLooksUpBySpan()
     {
         var generated = Generate(SharedAndBounded);
 
@@ -58,7 +59,7 @@ public class SpanKeyLookupTests
     }
 
     [Fact]
-    public void Net9Plus_EveryKeyInterpolationIsTheStoredKeyText()
+    public void SpanLookup_EveryKeyInterpolationIsTheStoredKeyText()
     {
         var generated = Generate(SharedAndBounded);
 
@@ -79,7 +80,7 @@ public class SpanKeyLookupTests
     }
 
     [Fact]
-    public void Net9Plus_KeyStringIsBuiltOnlyOnTheMissPath()
+    public void SpanLookup_KeyStringIsBuiltOnlyOnTheMissPath()
     {
         var generated = Generate(SharedAndBounded);
         var getAsync = generated.Substring(
@@ -92,9 +93,9 @@ public class SpanKeyLookupTests
     }
 
     [Fact]
-    public void Net8_KeepsTheStringKeyLookup()
+    public void CSharp9_KeepsTheStringKeyLookup()
     {
-        var generated = Generate(SharedAndBounded, net8MemoryCache: true);
+        var generated = Generate(SharedAndBounded, LanguageVersion.CSharp9);
 
         generated.Should().NotContain("__TryGetBySpanKey");
         generated.Should().NotContain("_memoryCache");
@@ -162,9 +163,9 @@ public class SpanKeyLookupTests
     }
 
     [Theory]
-    [InlineData(false)]
-    [InlineData(true)]
-    public async Task KeyParametersOfEveryKind_CompileWithoutErrorsOrGeneratedWarnings(bool net8MemoryCache)
+    [InlineData(LanguageVersion.Latest)]
+    [InlineData(LanguageVersion.CSharp9)]
+    public async Task KeyParametersOfEveryKind_CompileWithoutErrorsOrGeneratedWarnings(LanguageVersion languageVersion)
     {
         // Parameter names that the local function could collide with are included on purpose.
         var diagnostics = await TestHelper.GetDiagnostics("""
@@ -186,7 +187,7 @@ public class SpanKeyLookupTests
                 [Cache(TtlMs = 10000, MaxEntries = 5)]
                 ValueTask<int?> BoundedAsync(string __ignored, int id);
             }
-            """, net8MemoryCache: net8MemoryCache);
+            """, languageVersion: languageVersion);
 
         diagnostics
             .Where(d => d.Severity == DiagnosticSeverity.Error

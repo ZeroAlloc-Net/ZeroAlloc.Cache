@@ -19,7 +19,7 @@ internal sealed record CacheModel(
     bool AnyMethodUsesIMemoryCache,
     bool AnyMethodUsesIsolatedCache,      // MaxEntries > 0 on any non-hybrid method
     int IsolatedCacheMaxEntries,          // SizeLimit for the isolated MemoryCache (first MaxEntries > 0)
-    bool SpanKeyLookupAvailable,          // MemoryCache.TryGetValue(ReadOnlySpan<char>, out object?) is usable, #185
+    bool SpanKeyLookupAvailable,          // C# 10+: the key can be formatted into a span for MemoryCache.TryGetValue, #185
     ImmutableArray<CachedMethodModel> CachedMethods,
     ImmutableArray<PassthroughMethodModel> PassthroughMethods,
     ImmutableArray<DiagnosticInfo> Diagnostics,

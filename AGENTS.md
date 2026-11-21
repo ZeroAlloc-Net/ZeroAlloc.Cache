@@ -9,8 +9,8 @@ generator) and `ZeroAlloc.Cache.Generator` (standalone generator, kept for compa
 
 - `src/ZeroAlloc.Cache.Generator` targets `netstandard2.0` and is the only place generated code is
   written (`CacheWriter.cs`). It is packed under `analyzers/dotnet/cs`, not `lib/`.
-- `src/ZeroAlloc.Cache` multi-targets `net8.0` to `net11.0`. The `net8.0` build has no
-  `Microsoft.Extensions.Caching.Hybrid` reference, so HybridCache code paths do not exist there.
+- `src/ZeroAlloc.Cache` targets `net10.0` and `net11.0`, and references
+  `Microsoft.Extensions.Caching.Hybrid` on both.
 - `samples/ZeroAlloc.Cache.AotSmoke` is a NativeAOT app, not a demo. It is the trim and AOT gate.
 - `tests/ZeroAlloc.Cache.Generator.Tests/Snapshots/*.verified.cs` are Verify snapshots of generated
   code. A generator output change fails these tests; review the `.received.cs` diff and accept it on
@@ -20,9 +20,8 @@ generator) and `ZeroAlloc.Cache.Generator` (standalone generator, kept for compa
 ## Build and test
 
 SDK: `global.json` pins 11.0.100 (`rollForward: latestMinor`). Test projects target `net10.0` and
-`net11.0`, so both the .NET 10 and the .NET 11 runtime must be installed; the `net8.0` and `net9.0`
-library builds are compiled but never run by the tests. `dotnet tool restore` is needed first for
-GitVersion.
+`net11.0`, so both the .NET 10 and the .NET 11 runtime must be installed. `dotnet tool restore` is
+needed first for GitVersion.
 
 CI job `build` (`.github/workflows/ci.yml`):
 
@@ -73,9 +72,9 @@ dotnet test tests/ZeroAlloc.Cache.Generator.Tests -c Release -f net10.0
   Never edit the `*.Shipped.*` files; the release PR moves entries there.
 - Packing needs `-p:Version` on the build step as well as the pack step (`ZAVERSION001`,
   `ZAVERSION002` in `Directory.Build.props`). `--no-build` with an unversioned build fails.
-- A cache hit on `ValueTask<T>` with the default `MemoryCache` must allocate 0 B on .NET 9 and later.
-  `HitAllocationTests` enforces it, and the generator emits a span-key lookup for it that the `net8.0`
-  `Microsoft.Extensions.Caching.Memory` lacks, so `net8.0` keeps the string-key lookup. Do not add
+- A cache hit on `ValueTask<T>` with the default `MemoryCache` must allocate 0 B.
+  `HitAllocationTests` enforces it, and the generator emits a span-key lookup for it that needs
+  C# 10 interpolated string handlers, so a project below C# 10 keeps the string-key lookup. Do not add
   boxing, closures or string building to the hit path of generated code.
 - `HitAllocationTests` and the telemetry tests share the xunit collection
   `cache-telemetry-non-parallel`, because meter and activity listeners make every call allocate. Keep

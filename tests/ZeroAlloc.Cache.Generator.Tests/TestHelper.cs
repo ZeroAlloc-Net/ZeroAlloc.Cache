@@ -23,25 +23,11 @@ internal static class TestHelper
 
     /// <summary>
     /// <paramref name="referenceHybridCache"/> set to <see langword="false"/> leaves the HybridCache
-    /// assembly out, reproducing a consumer on net8.0 without the Microsoft.Extensions.Caching.Hybrid
-    /// package, where ZC0003 fires. The HybridCache type itself stays resolvable, as it does for that
-    /// consumer, because it lives in Microsoft.Extensions.Caching.Abstractions.
+    /// assembly out, reproducing a project that excludes Microsoft.Extensions.Caching.Hybrid, where
+    /// ZC0003 fires. The HybridCache type itself stays resolvable, as it does for that project,
+    /// because it lives in Microsoft.Extensions.Caching.Abstractions.
     /// </summary>
-    private const string MemoryCacheAssemblyFileName = "Microsoft.Extensions.Caching.Memory.dll";
-
-    /// <summary>
-    /// The net8.0 build of Microsoft.Extensions.Caching.Memory, copied next to the tests by the
-    /// project file. It has no <c>MemoryCache.TryGetValue(ReadOnlySpan&lt;char&gt;, out object?)</c>.
-    /// </summary>
-    private static readonly string Net8MemoryCachePath = System.IO.Path.Combine(
-        AppContext.BaseDirectory, "net8.0-memory-cache", MemoryCacheAssemblyFileName);
-
-    /// <summary>
-    /// <paramref name="net8MemoryCache"/> set to <see langword="true"/> swaps in the net8.0 build of
-    /// Microsoft.Extensions.Caching.Memory, reproducing a net8.0 consumer, where the generator keeps
-    /// the string key lookup because the span-based MemoryCache.TryGetValue does not exist. #185
-    /// </summary>
-    internal static List<MetadataReference> BuildReferences(bool referenceHybridCache = true, bool net8MemoryCache = false) =>
+    internal static List<MetadataReference> BuildReferences(bool referenceHybridCache = true) =>
         ((string?)AppContext.GetData("TRUSTED_PLATFORM_ASSEMBLIES") ?? string.Empty)
             .Split(System.IO.Path.PathSeparator)
             .Where(p => p.EndsWith(".dll", StringComparison.OrdinalIgnoreCase))
@@ -60,16 +46,17 @@ internal static class TestHelper
             .Distinct(StringComparer.OrdinalIgnoreCase)
             .Where(p => referenceHybridCache || !string.Equals(
                 System.IO.Path.GetFileName(p), HybridCacheAssemblyFileName, StringComparison.OrdinalIgnoreCase))
-            .Where(p => !net8MemoryCache || !string.Equals(
-                System.IO.Path.GetFileName(p), MemoryCacheAssemblyFileName, StringComparison.OrdinalIgnoreCase))
-            .Concat(net8MemoryCache ? new[] { Net8MemoryCachePath } : Array.Empty<string>())
             .Select(p => (MetadataReference)MetadataReference.CreateFromFile(p))
             .ToList();
 
-    public static void Verify(string source, bool net8MemoryCache = false)
+    /// <summary>
+    /// Snapshots the generated files. <paramref name="languageVersion"/> is the consumer's C# version.
+    /// </summary>
+    public static void Verify(string source, LanguageVersion languageVersion = LanguageVersion.Latest)
     {
-        var syntaxTree = CSharpSyntaxTree.ParseText(source, ParseOptions);
-        var references = BuildReferences(net8MemoryCache: net8MemoryCache);
+        var parseOptions = CSharpParseOptions.Default.WithLanguageVersion(languageVersion);
+        var syntaxTree = CSharpSyntaxTree.ParseText(source, parseOptions);
+        var references = BuildReferences();
 
         var compilation = CSharpCompilation.Create(
             "Tests",
@@ -80,7 +67,7 @@ internal static class TestHelper
         var generator = new CacheGenerator();
         var driver = CSharpGeneratorDriver
             .Create(generator)
-            .WithUpdatedParseOptions(ParseOptions)
+            .WithUpdatedParseOptions(parseOptions)
             .RunGenerators(compilation);
 
         GeneratorSnapshot.Verify(driver);
@@ -106,18 +93,20 @@ internal static class TestHelper
             .ToList();
     }
 
-    public static IReadOnlyList<string> GetGeneratedSources(string source, bool net8MemoryCache = false)
+    public static IReadOnlyList<string> GetGeneratedSources(
+        string source, LanguageVersion languageVersion = LanguageVersion.Latest)
     {
-        var syntaxTree = CSharpSyntaxTree.ParseText(source, ParseOptions);
+        var parseOptions = CSharpParseOptions.Default.WithLanguageVersion(languageVersion);
+        var syntaxTree = CSharpSyntaxTree.ParseText(source, parseOptions);
 
         var compilation = CSharpCompilation.Create(
             "Tests",
             new[] { syntaxTree },
-            BuildReferences(net8MemoryCache: net8MemoryCache),
+            BuildReferences(),
             new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
 
         var driver = CSharpGeneratorDriver.Create(new CacheGenerator())
-            .WithUpdatedParseOptions(ParseOptions)
+            .WithUpdatedParseOptions(parseOptions)
             .RunGenerators(compilation);
 
         return driver.GetRunResult().GeneratedTrees
@@ -130,7 +119,7 @@ internal static class TestHelper
     /// generated code. <paramref name="languageVersion"/> is the consumer's C# version.
     /// </summary>
     public static (Compilation Compilation, IReadOnlyList<SyntaxTree> GeneratedTrees) Compile(
-        string source, bool net8MemoryCache = false, LanguageVersion languageVersion = LanguageVersion.Latest)
+        string source, LanguageVersion languageVersion = LanguageVersion.Latest)
     {
         var parseOptions = CSharpParseOptions.Default.WithLanguageVersion(languageVersion);
         var syntaxTree = CSharpSyntaxTree.ParseText(source, parseOptions);
@@ -138,7 +127,7 @@ internal static class TestHelper
         var compilation = CSharpCompilation.Create(
             "Tests",
             new[] { syntaxTree },
-            BuildReferences(net8MemoryCache: net8MemoryCache),
+            BuildReferences(),
             new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
 
         var result = CSharpGeneratorDriver.Create(new CacheGenerator())
@@ -150,10 +139,11 @@ internal static class TestHelper
     }
 
     public static Task<IReadOnlyList<Diagnostic>> GetDiagnostics(
-        string source, bool referenceHybridCache = true, bool net8MemoryCache = false)
+        string source, bool referenceHybridCache = true, LanguageVersion languageVersion = LanguageVersion.Latest)
     {
-        var syntaxTree = CSharpSyntaxTree.ParseText(source, ParseOptions);
-        var references = BuildReferences(referenceHybridCache, net8MemoryCache);
+        var parseOptions = CSharpParseOptions.Default.WithLanguageVersion(languageVersion);
+        var syntaxTree = CSharpSyntaxTree.ParseText(source, parseOptions);
+        var references = BuildReferences(referenceHybridCache);
 
         var compilation = CSharpCompilation.Create(
             "Tests",
@@ -163,7 +153,7 @@ internal static class TestHelper
 
         var generator = new CacheGenerator();
         var driver = CSharpGeneratorDriver.Create(generator)
-            .WithUpdatedParseOptions(ParseOptions)
+            .WithUpdatedParseOptions(parseOptions)
             .RunGenerators(compilation);
 
         var result = driver.GetRunResult();

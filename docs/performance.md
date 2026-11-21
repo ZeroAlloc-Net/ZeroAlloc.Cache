@@ -8,7 +8,7 @@ sidebar_position: 6
 
 # Performance
 
-ZeroAlloc.Cache is designed for hot-path caching, where a cache hit should not allocate. On .NET 9 and later, a hit on a `ValueTask<T>` method backed by the default `MemoryCache` allocates nothing. This page explains how, lists every case where a hit still allocates, and describes the benchmarks and the test that guard the claim.
+ZeroAlloc.Cache is designed for hot-path caching, where a cache hit should not allocate. A hit on a `ValueTask<T>` method backed by the default `MemoryCache` allocates nothing. This page explains how, lists every case where a hit still allocates, and describes the benchmarks and the test that guard the claim.
 
 ## How a cache hit avoids allocation
 
@@ -18,7 +18,7 @@ The generator emits a cache proxy per `[Cache]`-annotated interface. Four decisi
 
 Every entry is stored under the string key `{Interface}.{Method}:{arg1}:{arg2}`, for example `IProductRepository.GetByIdAsync:42`. For an interface nested in another type, `{Interface}` starts with the containing types, as in `Catalog.IProductLookup.GetByIdAsync:42`. When two interfaces in the project would use the same `{Interface}`, such as `Shipping.IProductLookup` and `Billing.IProductLookup`, both start with their namespace instead, as in `Shipping.IProductLookup.GetByIdAsync:42`, so they never read each other's entries. Every other interface keeps the shorter text. On a hit the proxy does not build that string. It formats the same text into a 256-character stack buffer with `MemoryExtensions.TryWrite` and looks it up with `MemoryCache.TryGetValue(ReadOnlySpan<char>, out object?)`, which finds the entry stored under the equal string. The formatting is the same as the string key's, current culture included, so the stored key text is unchanged and entries can still be read or removed by it.
 
-The generator emits the span lookup only when the API exists: `MemoryCache.TryGetValue(ReadOnlySpan<char>, ...)` ships in the net9.0 and later builds of Microsoft.Extensions.Caching.Memory 9.0+. At run time the proxy uses it only when the injected `IMemoryCache` is exactly `MemoryCache`, which is what `AddMemoryCache()` registers. A subclass or decorator may re-implement the lookup, so it keeps the string key lookup. The size-limited cache of `MaxEntries` methods is always a `MemoryCache`.
+The generator emits the span lookup when the project compiles with C# 10 or later, which formats the key into the stack buffer with an interpolated string handler. With an older `LangVersion` it keeps the string key lookup. At run time the proxy uses the span lookup only when the injected `IMemoryCache` is exactly `MemoryCache`, which is what `AddMemoryCache()` registers. A subclass or decorator may re-implement the lookup, so it keeps the string key lookup. The size-limited cache of `MaxEntries` methods is always a `MemoryCache`.
 
 **2. The entry is read as `object` and tested against the concrete type**
 
@@ -39,7 +39,7 @@ A hit allocates in these cases. `CachedLookupBenchmark` and the `HitAllocationTe
 | Case | What a hit allocates |
 |---|---|
 | The method returns `Task<T>` | The `Task<T>`, 72 B for a `Task<string>`, except for the few results the runtime caches, such as `null` and `false`. Return `ValueTask<T>` instead. |
-| The consumer targets net8.0 or netstandard2.0 | The key string, because Microsoft.Extensions.Caching.Memory has no span lookup there: 88 B for `ICustomerService.GetNameAsync:42`, more for longer keys. |
+| The project sets `LangVersion` below C# 10 | The key string, because the key cannot be formatted into a span without interpolated string handlers: 88 B for `ICustomerService.GetNameAsync:42`, more for longer keys. |
 | The `IMemoryCache` is not exactly `MemoryCache` | The key string, as above: the proxy cannot bypass a decorator's or subclass's lookup. |
 | The method uses `UseHybridCache = true` | The key string, because `HybridCache` takes only string keys, plus whatever `HybridCache` allocates itself. |
 | A key parameter is a nullable value type, such as `int?` | The boxed value, 24 B for an `int?`, because string interpolation boxes a `Nullable<T>`. |
