@@ -74,7 +74,9 @@ dotnet test tests/ZeroAlloc.Cache.Generator.Tests -c Release -f net10.0
   `ZAVERSION002` in `Directory.Build.props`). `--no-build` with an unversioned build fails.
 - A cache hit on `ValueTask<T>` with the default `MemoryCache` must allocate 0 B.
   `HitAllocationTests` enforces it, and the generator emits a span-key lookup for it that needs
-  C# 10 interpolated string handlers, so a project below C# 10 keeps the string-key lookup. Do not add
+  C# 10 and `MemoryCache.TryGetValue(ReadOnlySpan<char>, ...)`. The standalone generator package can
+  meet the net8.0 `Microsoft.Extensions.Caching.Memory`, which lacks it, so the generator still probes
+  for it and keeps the string-key lookup without it. Do not add
   boxing, closures or string building to the hit path of generated code.
 - `HitAllocationTests` and the telemetry tests share the xunit collection
   `cache-telemetry-non-parallel`, because meter and activity listeners make every call allocate. Keep

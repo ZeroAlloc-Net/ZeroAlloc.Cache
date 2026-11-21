@@ -1,4 +1,3 @@
-using Microsoft.CodeAnalysis.CSharp;
 using System.Threading.Tasks;
 
 namespace ZeroAlloc.Cache.Generator.Tests;
@@ -22,28 +21,28 @@ public sealed class SnapshotTests
         TestHelper.Verify(source);
     }
 
-    // Below C# 10 the key cannot be formatted into a span, so the proxy keeps the string key
-    // lookup, and one shared and one bounded method pin its full shape. #185
+    // The net8.0 build of Microsoft.Extensions.Caching.Memory, which a project referencing only the
+    // standalone generator package can compile against, has no
+    // MemoryCache.TryGetValue(ReadOnlySpan<char>, ...), so the proxy keeps
+    // the string key lookup, and one shared and one bounded method pin its full shape. #185
     [Fact]
-    public void CSharp9_KeepsStringKeyLookup()
+    public void Net8MemoryCache_KeepsStringKeyLookup()
     {
         var source = """
             using ZeroAlloc.Cache;
             using System.Threading;
             using System.Threading.Tasks;
-            namespace T
+            namespace T;
+            public interface IMyService
             {
-                public interface IMyService
-                {
-                    [Cache(TtlMs = 30_000)]
-                    ValueTask<string> GetAsync(string id, CancellationToken ct);
+                [Cache(TtlMs = 30_000)]
+                ValueTask<string> GetAsync(string id, CancellationToken ct);
 
-                    [Cache(TtlMs = 30_000, MaxEntries = 100)]
-                    ValueTask<int> CountAsync(int id, CancellationToken ct);
-                }
+                [Cache(TtlMs = 30_000, MaxEntries = 100)]
+                ValueTask<int> CountAsync(int id, CancellationToken ct);
             }
             """;
-        TestHelper.Verify(source, LanguageVersion.CSharp9);
+        TestHelper.Verify(source, net8MemoryCache: true);
     }
 
     [Fact]

@@ -135,7 +135,7 @@ public sealed class DiagnosticTests
         zc0003[0].Severity.Should().Be(DiagnosticSeverity.Error);
         // ZeroAlloc.Cache targets net10.0 and later only, so the message no longer suggests a target framework.
         zc0003[0].GetMessage(System.Globalization.CultureInfo.InvariantCulture).Should().Be(
-            "UseHybridCache = true requires Microsoft.Extensions.Caching.Hybrid. Add a package reference to it.");
+            "UseHybridCache = true requires Microsoft.Extensions.Caching.Hybrid, which this compilation does not reference. Reference the package without excluding its compile assets.");
 
         // The error suppresses generation for the interface: no proxy and no DI extension, so the
         // consumer sees ZC0003 rather than CS1061 on the generated AddHybridCache call.

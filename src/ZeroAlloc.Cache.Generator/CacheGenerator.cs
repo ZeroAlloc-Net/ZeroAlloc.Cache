@@ -231,7 +231,7 @@ public sealed class CacheGenerator : IIncrementalGenerator
             cachedMethods.Exists(static m => !m.EffectiveConfig.UseHybridCache && m.EffectiveConfig.MaxEntries == 0),
             cachedMethods.Exists(static m => m.UsesBoundedCache),
             isolatedCacheMaxEntries,
-            IsSpanKeyLookupAvailable(ctx.Node.SyntaxTree.Options),
+            IsSpanKeyLookupAvailable(ctx.SemanticModel.Compilation, ctx.Node.SyntaxTree.Options),
             System.Collections.Immutable.ImmutableArray.CreateRange(cachedMethods),
             System.Collections.Immutable.ImmutableArray.CreateRange(passthroughMethods),
             System.Collections.Immutable.ImmutableArray.CreateRange(diagnostics),
@@ -666,7 +666,8 @@ public sealed class CacheGenerator : IIncrementalGenerator
         // HybridCache type. HybridCache itself lives in Microsoft.Extensions.Caching.Abstractions,
         // which is always referenced, so probing it never fired: a project without the
         // Microsoft.Extensions.Caching.Hybrid assembly got CS1061 in generated code. ZeroAlloc.Cache
-        // references that package, so this fires only when the project excludes its compile asset.
+        // references that package, so this fires only when the project excludes its compile asset, or
+        // references the standalone ZeroAlloc.Cache.Generator package without ZeroAlloc.Cache 2.x.
         var addHybridCacheType = ctx.SemanticModel.Compilation
             .GetTypeByMetadataName("Microsoft.Extensions.DependencyInjection.HybridCacheServiceExtensions");
         if (addHybridCacheType is not null)
@@ -679,14 +680,41 @@ public sealed class CacheGenerator : IIncrementalGenerator
     }
 
     /// <summary>
-    /// True when the generated hit path can look the key up without building a string: it formats
-    /// the key into a span with <c>MemoryExtensions.TryWrite</c>, which needs C# 10 interpolated
-    /// string handlers, and passes it to <c>MemoryCache.TryGetValue(ReadOnlySpan&lt;char&gt;, out object?)</c>.
-    /// ZeroAlloc.Cache targets net10.0 and later only, where both the handler and that overload
-    /// always exist, so the consumer's language version is the only thing left to check. See #185.
+    /// True when the generated hit path can look the key up without building a string: the
+    /// referenced MemoryCache has the non-generic <c>TryGetValue(ReadOnlySpan&lt;char&gt;, out object?)</c>,
+    /// Microsoft.Extensions.Caching.Memory 9.0+ on net9.0+, and the key can be formatted into a
+    /// span with <c>MemoryExtensions.TryWrite</c>, which needs C# 10 interpolated string handlers.
+    /// ZeroAlloc.Cache itself targets net10.0 and later, where both exist, but the standalone
+    /// ZeroAlloc.Cache.Generator package has no framework floor: a project referencing only it can
+    /// compile against the net8.0 build of Microsoft.Extensions.Caching.Memory, or below C# 10,
+    /// and then keeps the string key lookup. See #185.
     /// </summary>
-    private static bool IsSpanKeyLookupAvailable(ParseOptions options) =>
-        options is Microsoft.CodeAnalysis.CSharp.CSharpParseOptions { LanguageVersion: >= Microsoft.CodeAnalysis.CSharp.LanguageVersion.CSharp10 };
+    private static bool IsSpanKeyLookupAvailable(Compilation compilation, ParseOptions options)
+    {
+        if (options is not Microsoft.CodeAnalysis.CSharp.CSharpParseOptions { LanguageVersion: >= Microsoft.CodeAnalysis.CSharp.LanguageVersion.CSharp10 })
+            return false;
+
+        if (compilation.GetTypeByMetadataName("System.MemoryExtensions+TryWriteInterpolatedStringHandler") is null)
+            return false;
+
+        var memoryCache = compilation.GetTypeByMetadataName("Microsoft.Extensions.Caching.Memory.MemoryCache");
+        if (memoryCache is null)
+            return false;
+
+        foreach (var member in memoryCache.GetMembers("TryGetValue"))
+        {
+            if (member is IMethodSymbol { DeclaredAccessibility: Accessibility.Public, IsStatic: false, IsGenericMethod: false, Parameters.Length: 2 } method
+                && method.Parameters[0].Type is INamedTypeSymbol { IsGenericType: true, TypeArguments.Length: 1 } span
+                && string.Equals(span.OriginalDefinition.ToDisplayString(), "System.ReadOnlySpan<T>", System.StringComparison.Ordinal)
+                && span.TypeArguments[0].SpecialType == SpecialType.System_Char
+                && method.Parameters[1].RefKind == RefKind.Out
+                && method.Parameters[1].Type.SpecialType == SpecialType.System_Object)
+            {
+                return true;
+            }
+        }
+        return false;
+    }
 
     private static AttributeData? FindCacheAttr(ISymbol symbol)
     {

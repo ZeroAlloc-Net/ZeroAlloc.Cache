@@ -1,5 +1,4 @@
 using Microsoft.CodeAnalysis;
-using Microsoft.CodeAnalysis.CSharp;
 using System.Linq;
 using System.Threading.Tasks;
 using Xunit;
@@ -22,8 +21,7 @@ public class CacheHitShapeTests
         using System.Threading.Tasks;
         using ZeroAlloc.Cache;
 
-        // A plain struct, not a record struct, so the C# 9 cases compile.
-        public readonly struct Money { public Money(decimal amount) => Amount = amount; public decimal Amount { get; } }
+        public readonly record struct Money(decimal Amount);
 
         public interface IThing
         {
@@ -32,8 +30,8 @@ public class CacheHitShapeTests
         }
         """;
 
-    private static string Generate(string returnType, string attribute, LanguageVersion languageVersion) =>
-        string.Join("\n", TestHelper.GetGeneratedSources(Source(returnType, attribute), languageVersion));
+    private static string Generate(string returnType, string attribute, bool net8MemoryCache) =>
+        string.Join("\n", TestHelper.GetGeneratedSources(Source(returnType, attribute), net8MemoryCache));
 
     [Theory]
     [InlineData("ValueTask<int>", "__boxed is int __cached", "return __cached;")]
@@ -46,33 +44,33 @@ public class CacheHitShapeTests
     [InlineData("ValueTask<string?>", "__boxed is null or string", "return (string?)__boxed;")]
     public void HitPath_TestsTheConcreteType(string returnType, string condition, string hitReturn)
     {
-        // Below C# 10: the string key lookup.
-        var stringKey = Generate(returnType, Unbounded, LanguageVersion.CSharp9);
+        // net8.0: the string key lookup.
+        var stringKey = Generate(returnType, Unbounded, net8MemoryCache: true);
         stringKey.Should().Contain($"_cache.TryGetValue(__key, out object? __boxed) && {condition})");
         stringKey.Should().Contain(hitReturn);
 
-        // C# 10 and later: the span key lookup, #185, keeps the same concrete type test.
-        var spanKey = Generate(returnType, Unbounded, LanguageVersion.Latest);
+        // net9.0+: the span key lookup, #185, keeps the same concrete type test.
+        var spanKey = Generate(returnType, Unbounded, net8MemoryCache: false);
         spanKey.Should().Contain($"if (__found && {condition})");
         spanKey.Should().Contain(hitReturn);
     }
 
     [Theory]
-    [InlineData("ValueTask<int>", Unbounded, LanguageVersion.Latest)]
-    [InlineData("ValueTask<int?>", Unbounded, LanguageVersion.Latest)]
-    [InlineData("ValueTask<Money>", Unbounded, LanguageVersion.Latest)]
-    [InlineData("ValueTask<Money?>", Unbounded, LanguageVersion.Latest)]
-    [InlineData("ValueTask<string?>", Unbounded, LanguageVersion.Latest)]
-    [InlineData("ValueTask<int>", Bounded, LanguageVersion.Latest)]
-    [InlineData("ValueTask<int?>", Bounded, LanguageVersion.Latest)]
-    [InlineData("ValueTask<Money?>", Bounded, LanguageVersion.Latest)]
-    [InlineData("ValueTask<string?>", Bounded, LanguageVersion.Latest)]
-    [InlineData("ValueTask<int>", Unbounded, LanguageVersion.CSharp9)]
-    [InlineData("ValueTask<int?>", Unbounded, LanguageVersion.CSharp9)]
-    [InlineData("ValueTask<Money?>", Bounded, LanguageVersion.CSharp9)]
-    public void HitPath_NeverCallsTheGenericTryGetValue(string returnType, string attribute, LanguageVersion languageVersion)
+    [InlineData("ValueTask<int>", Unbounded, false)]
+    [InlineData("ValueTask<int?>", Unbounded, false)]
+    [InlineData("ValueTask<Money>", Unbounded, false)]
+    [InlineData("ValueTask<Money?>", Unbounded, false)]
+    [InlineData("ValueTask<string?>", Unbounded, false)]
+    [InlineData("ValueTask<int>", Bounded, false)]
+    [InlineData("ValueTask<int?>", Bounded, false)]
+    [InlineData("ValueTask<Money?>", Bounded, false)]
+    [InlineData("ValueTask<string?>", Bounded, false)]
+    [InlineData("ValueTask<int>", Unbounded, true)]
+    [InlineData("ValueTask<int?>", Unbounded, true)]
+    [InlineData("ValueTask<Money?>", Bounded, true)]
+    public void HitPath_NeverCallsTheGenericTryGetValue(string returnType, string attribute, bool net8MemoryCache)
     {
-        var (compilation, generatedTrees) = TestHelper.Compile(Source(returnType, attribute), languageVersion);
+        var (compilation, generatedTrees) = TestHelper.Compile(Source(returnType, attribute), net8MemoryCache);
 
         var calls = generatedTrees
             .SelectMany(tree => tree.GetRoot().DescendantNodes()
@@ -81,7 +79,7 @@ public class CacheHitShapeTests
             .Where(method => method is { Name: "TryGetValue" })
             .ToList();
 
-        // Only the non-generic TryGetValue(object, out object?) and, from C# 10 on, the non-generic
+        // Only the non-generic TryGetValue(object, out object?) and, on net9.0+, the non-generic
         // MemoryCache.TryGetValue(ReadOnlySpan<char>, out object?) may be called.
         calls.Should().NotBeEmpty();
         calls.Should().AllSatisfy(method =>
@@ -104,16 +102,13 @@ public class CacheHitShapeTests
     [InlineData("ValueTask<string?>", Bounded)]
     public async Task HitPath_CompilesWithoutErrorsOrGeneratedWarnings(string returnType, string attribute)
     {
-        foreach (var languageVersion in LanguageVersions)
-            await AssertCompilesCleanly(Source(returnType, attribute), languageVersion);
+        foreach (var net8MemoryCache in new[] { false, true })
+            await AssertCompilesCleanly(Source(returnType, attribute), net8MemoryCache);
     }
 
-    // The span key lookup from C# 10 on, and the string key lookup below it.
-    private static readonly LanguageVersion[] LanguageVersions = { LanguageVersion.Latest, LanguageVersion.CSharp9 };
-
-    private static async Task AssertCompilesCleanly(string source, LanguageVersion languageVersion)
+    private static async Task AssertCompilesCleanly(string source, bool net8MemoryCache)
     {
-        var diagnostics = await TestHelper.GetDiagnostics(source, languageVersion: languageVersion).ConfigureAwait(false);
+        var diagnostics = await TestHelper.GetDiagnostics(source, net8MemoryCache: net8MemoryCache).ConfigureAwait(false);
 
         // Errors anywhere, and warnings inside the generated proxy, which consumers build with
         // warnings as errors. The proxy is emitted under #nullable enable.
@@ -145,7 +140,7 @@ public class CacheHitShapeTests
             }
             """;
 
-        foreach (var languageVersion in LanguageVersions)
-            await AssertCompilesCleanly(source, languageVersion);
+        foreach (var net8MemoryCache in new[] { false, true })
+            await AssertCompilesCleanly(source, net8MemoryCache);
     }
 }
