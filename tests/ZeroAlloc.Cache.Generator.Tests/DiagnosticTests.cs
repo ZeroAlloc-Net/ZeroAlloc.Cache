@@ -133,7 +133,9 @@ public sealed class DiagnosticTests
         var zc0003 = diags.Where(d => string.Equals(d.Id, "ZC0003", StringComparison.Ordinal)).ToList();
         zc0003.Should().HaveCount(1);
         zc0003[0].Severity.Should().Be(DiagnosticSeverity.Error);
-        zc0003[0].GetMessage().Should().Contain("Microsoft.Extensions.Caching.Hybrid");
+        // ZeroAlloc.Cache targets net10.0 and later only, so the message no longer suggests a target framework.
+        zc0003[0].GetMessage(System.Globalization.CultureInfo.InvariantCulture).Should().Be(
+            "UseHybridCache = true requires Microsoft.Extensions.Caching.Hybrid, which this compilation does not reference. Reference the package without excluding its compile assets.");
 
         // The error suppresses generation for the interface: no proxy and no DI extension, so the
         // consumer sees ZC0003 rather than CS1061 on the generated AddHybridCache call.

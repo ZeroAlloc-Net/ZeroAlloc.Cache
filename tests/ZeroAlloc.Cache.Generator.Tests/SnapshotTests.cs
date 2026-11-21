@@ -21,7 +21,9 @@ public sealed class SnapshotTests
         TestHelper.Verify(source);
     }
 
-    // A net8.0 consumer has no MemoryCache.TryGetValue(ReadOnlySpan<char>, ...), so the proxy keeps
+    // The net8.0 build of Microsoft.Extensions.Caching.Memory, which a project referencing only the
+    // standalone generator package can compile against, has no
+    // MemoryCache.TryGetValue(ReadOnlySpan<char>, ...), so the proxy keeps
     // the string key lookup, and one shared and one bounded method pin its full shape. #185
     [Fact]
     public void Net8MemoryCache_KeepsStringKeyLookup()

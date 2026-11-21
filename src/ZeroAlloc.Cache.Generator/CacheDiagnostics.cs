@@ -27,7 +27,7 @@ internal static class CacheDiagnostics
     public static readonly DiagnosticDescriptor HybridCacheNotAvailable = new(
         id: "ZC0003",
         title: "HybridCache not available",
-        messageFormat: "UseHybridCache = true requires Microsoft.Extensions.Caching.Hybrid (net9.0+). Add a package reference or target net9.0 or later.",
+        messageFormat: "UseHybridCache = true requires Microsoft.Extensions.Caching.Hybrid, which this compilation does not reference. Reference the package without excluding its compile assets.",
         category: Category,
         defaultSeverity: DiagnosticSeverity.Error,
         isEnabledByDefault: true
@@ -63,7 +63,7 @@ internal static class CacheDiagnostics
         title: "Containing type of a [Cache] interface is not partial",
         messageFormat: "No cache proxy is generated for interface '{0}' because its containing type '{1}' is not partial",
         category: Category,
-        defaultSeverity: DiagnosticSeverity.Warning,
+        defaultSeverity: DiagnosticSeverity.Error,
         isEnabledByDefault: true);
 
     /// <summary>
@@ -75,7 +75,7 @@ internal static class CacheDiagnostics
         title: "Generic [Cache] interface is not generated",
         messageFormat: "No cache proxy is generated for interface '{0}' because it is generic or nested in a generic type, which its Add...Cache extension method cannot name",
         category: Category,
-        defaultSeverity: DiagnosticSeverity.Warning,
+        defaultSeverity: DiagnosticSeverity.Error,
         isEnabledByDefault: true);
 
     /// <summary>
@@ -87,7 +87,7 @@ internal static class CacheDiagnostics
         title: "[Cache] interface is not accessible from its namespace",
         messageFormat: "No cache proxy is generated for interface '{0}' because it is private or protected, or nested in such a type, which its Add...Cache extension method cannot name",
         category: Category,
-        defaultSeverity: DiagnosticSeverity.Warning,
+        defaultSeverity: DiagnosticSeverity.Error,
         isEnabledByDefault: true);
 
     /// <summary>

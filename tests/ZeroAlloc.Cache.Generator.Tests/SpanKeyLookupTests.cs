@@ -11,7 +11,9 @@ namespace ZeroAlloc.Cache.Generator.Tests;
 /// #185: on a cache hit the generated proxy formats the key into a stack buffer and looks it up
 /// with <c>MemoryCache.TryGetValue(ReadOnlySpan&lt;char&gt;, out object?)</c>, so the hit allocates no
 /// key string. The key text stays exactly what it was, because users read and evict entries by
-/// it. The generator only takes that path when the API exists; net8.0 keeps the string lookup.
+/// it. The generator only takes that path when the API exists; the net8.0 build of
+/// Microsoft.Extensions.Caching.Memory, reachable only through the standalone generator package,
+/// keeps the string lookup.
 /// </summary>
 public class SpanKeyLookupTests
 {

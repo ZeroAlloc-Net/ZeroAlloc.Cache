@@ -23,9 +23,10 @@ internal static class TestHelper
 
     /// <summary>
     /// <paramref name="referenceHybridCache"/> set to <see langword="false"/> leaves the HybridCache
-    /// assembly out, reproducing a consumer on net8.0 without the Microsoft.Extensions.Caching.Hybrid
-    /// package, where ZC0003 fires. The HybridCache type itself stays resolvable, as it does for that
-    /// consumer, because it lives in Microsoft.Extensions.Caching.Abstractions.
+    /// assembly out, reproducing a project that does not compile against the
+    /// Microsoft.Extensions.Caching.Hybrid package, where ZC0003 fires. The HybridCache type itself
+    /// stays resolvable, as it does for that project, because it lives in
+    /// Microsoft.Extensions.Caching.Abstractions.
     /// </summary>
     private const string MemoryCacheAssemblyFileName = "Microsoft.Extensions.Caching.Memory.dll";
 
@@ -38,7 +39,8 @@ internal static class TestHelper
 
     /// <summary>
     /// <paramref name="net8MemoryCache"/> set to <see langword="true"/> swaps in the net8.0 build of
-    /// Microsoft.Extensions.Caching.Memory, reproducing a net8.0 consumer, where the generator keeps
+    /// Microsoft.Extensions.Caching.Memory, reproducing a net8.0 project that references only the
+    /// standalone ZeroAlloc.Cache.Generator package, where the generator keeps
     /// the string key lookup because the span-based MemoryCache.TryGetValue does not exist. #185
     /// </summary>
     internal static List<MetadataReference> BuildReferences(bool referenceHybridCache = true, bool net8MemoryCache = false) =>

@@ -9,14 +9,14 @@ namespace ZeroAlloc.Cache.Benchmarks;
 // Measures the generator-emitted cache proxy on a CACHE HIT, the hot path after the first request
 // has warmed the entry.
 //
-// The claim: with a plain MemoryCache on .NET 9 or later, a hit on a ValueTask<T> method allocates
+// The claim: with a plain MemoryCache, a hit on a ValueTask<T> method allocates
 // 0 B/op. The key text is formatted into a stack buffer and looked up with
 // MemoryCache.TryGetValue(ReadOnlySpan<char>, out object?), so no key string is built, and a value
 // type is unboxed from the entry, which does not allocate. See #185.
 //
 // Where a hit still allocates is listed in docs/performance.md. The "other IMemoryCache" row shows
 // the largest case: any IMemoryCache that is not exactly MemoryCache gets the string key lookup,
-// which builds the key string on every hit. The same applies on net8.0.
+// which builds the key string on every hit.
 //
 // The benchmarks return the proxy's ValueTask directly. An async wrapper method would allocate its
 // own Task<T> and hide the proxy's allocation behind it.

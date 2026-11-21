@@ -265,7 +265,7 @@ public sealed class NestedInterfaceTests
         run.HintNames.Should().Equal("N.IOther.Cache.g.cs");
         var diagnostic = run.GeneratorDiagnostics.Should().ContainSingle().Which;
         diagnostic.Id.Should().Be("ZC0006");
-        diagnostic.Severity.Should().Be(DiagnosticSeverity.Warning);
+        diagnostic.Severity.Should().Be(DiagnosticSeverity.Error);
         diagnostic.GetMessage(CultureInfo.InvariantCulture).Should().Be(
             "No cache proxy is generated for interface 'N.Outer.IFoo' because its containing type 'N.Outer' is not partial");
         AssertOnName(diagnostic, source, "IFoo");
@@ -286,6 +286,7 @@ public sealed class NestedInterfaceTests
         run.HintNames.Should().BeEmpty();
         var diagnostic = run.GeneratorDiagnostics.Should().ContainSingle().Which;
         diagnostic.Id.Should().Be("ZC0006");
+        diagnostic.Severity.Should().Be(DiagnosticSeverity.Error);
         diagnostic.GetMessage(CultureInfo.InvariantCulture).Should().Be(
             "No cache proxy is generated for interface 'N.Outer.Middle.IFoo' because its containing type 'N.Outer' is not partial");
         AssertOnName(diagnostic, source, "IFoo");
@@ -306,7 +307,7 @@ public sealed class NestedInterfaceTests
         run.HintNames.Should().BeEmpty();
         var diagnostic = run.GeneratorDiagnostics.Should().ContainSingle().Which;
         diagnostic.Id.Should().Be("ZC0007");
-        diagnostic.Severity.Should().Be(DiagnosticSeverity.Warning);
+        diagnostic.Severity.Should().Be(DiagnosticSeverity.Error);
         diagnostic.GetMessage(CultureInfo.InvariantCulture).Should().Be(
             $"No cache proxy is generated for interface '{display}' because it is generic or nested in a generic type, which its Add...Cache extension method cannot name");
         AssertOnName(diagnostic, source, "IFoo");
@@ -338,7 +339,7 @@ public sealed class NestedInterfaceTests
         run.HintNames.Should().BeEmpty();
         var diagnostic = run.GeneratorDiagnostics.Should().ContainSingle().Which;
         diagnostic.Id.Should().Be("ZC0008");
-        diagnostic.Severity.Should().Be(DiagnosticSeverity.Warning);
+        diagnostic.Severity.Should().Be(DiagnosticSeverity.Error);
         diagnostic.GetMessage(CultureInfo.InvariantCulture).Should().Be(
             "No cache proxy is generated for interface 'N.Outer.IFoo' because it is private or protected, or nested in such a type, which its Add...Cache extension method cannot name");
         AssertOnName(diagnostic, source, "IFoo");
@@ -355,7 +356,9 @@ public sealed class NestedInterfaceTests
             """);
 
         run.CompileErrors.Should().BeEmpty();
-        run.GeneratorDiagnostics.Should().ContainSingle().Which.Id.Should().Be("ZC0008");
+        var diagnostic = run.GeneratorDiagnostics.Should().ContainSingle().Which;
+        diagnostic.Id.Should().Be("ZC0008");
+        diagnostic.Severity.Should().Be(DiagnosticSeverity.Error);
     }
 
     [Fact]

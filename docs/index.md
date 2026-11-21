@@ -16,9 +16,9 @@
 | [ZC0003](diagnostics/ZC0003.md) | Error | `UseHybridCache = true` without a reference to `Microsoft.Extensions.Caching.Hybrid` — no proxy is generated for the interface |
 | [ZC0004](diagnostics/ZC0004.md) | Warning | Bounded methods on one interface set different `MaxEntries` values — they share one size-limited cache sized by the first bounded method |
 | [ZC0005](diagnostics/ZC0005.md) | Warning | `[Cache]` on a method that does not return `Task<T>` or `ValueTask<T>` — caching is not applied |
-| [ZC0006](diagnostics/ZC0006.md) | Warning | A nested interface whose containing type is not `partial` — no proxy is generated for it |
-| [ZC0007](diagnostics/ZC0007.md) | Warning | A generic interface, or one nested in a generic type — no proxy is generated for it |
-| [ZC0008](diagnostics/ZC0008.md) | Warning | A private or protected nested interface, which the namespace-level `Add…Cache` method cannot name — no proxy is generated for it |
+| [ZC0006](diagnostics/ZC0006.md) | Error | A nested interface whose containing type is not `partial` — no proxy is generated for it |
+| [ZC0007](diagnostics/ZC0007.md) | Error | A generic interface, or one nested in a generic type — no proxy is generated for it |
+| [ZC0008](diagnostics/ZC0008.md) | Error | A private or protected nested interface, which the namespace-level `Add…Cache` method cannot name — no proxy is generated for it |
 | [ZC0009](diagnostics/ZC0009.md) | Error | A file-local interface — no proxy is generated for it |
 | [ZC0010](diagnostics/ZC0010.md) | Error | An interface whose name differs only in case from another's — only the first is generated |
 | [ZC0011](diagnostics/ZC0011.md) | Warning | In a NativeAOT or trimmed project, a `HybridCache` method caches a type other than `string` or `byte[]` and no `IHybridCacheSerializer<T>` exists for it — `HybridCache`'s default serializer throws on the first miss |

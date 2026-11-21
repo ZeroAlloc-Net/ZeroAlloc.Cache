@@ -663,9 +663,11 @@ public sealed class CacheGenerator : IIncrementalGenerator
             return;
 
         // Probe for the AddHybridCache() extension the generated DI registration calls, not for the
-        // HybridCache type. HybridCache itself lives in Microsoft.Extensions.Caching.Abstractions 9.0+,
-        // which ZeroAlloc.Cache always brings in, so probing it never fired: a net8.0 consumer
-        // without the Microsoft.Extensions.Caching.Hybrid package got CS1061 in generated code.
+        // HybridCache type. HybridCache itself lives in Microsoft.Extensions.Caching.Abstractions,
+        // which is always referenced, so probing it never fired: a project without the
+        // Microsoft.Extensions.Caching.Hybrid assembly got CS1061 in generated code. ZeroAlloc.Cache
+        // references that package, so this fires only when the project excludes its compile asset, or
+        // references the standalone ZeroAlloc.Cache.Generator package without ZeroAlloc.Cache 2.x.
         var addHybridCacheType = ctx.SemanticModel.Compilation
             .GetTypeByMetadataName("Microsoft.Extensions.DependencyInjection.HybridCacheServiceExtensions");
         if (addHybridCacheType is not null)
@@ -682,7 +684,10 @@ public sealed class CacheGenerator : IIncrementalGenerator
     /// referenced MemoryCache has the non-generic <c>TryGetValue(ReadOnlySpan&lt;char&gt;, out object?)</c>,
     /// Microsoft.Extensions.Caching.Memory 9.0+ on net9.0+, and the key can be formatted into a
     /// span with <c>MemoryExtensions.TryWrite</c>, which needs C# 10 interpolated string handlers.
-    /// A net8.0 or netstandard2.0 consumer gets neither and keeps the string key lookup. See #185.
+    /// ZeroAlloc.Cache itself targets net10.0 and later, where both exist, but the standalone
+    /// ZeroAlloc.Cache.Generator package has no framework floor: a project referencing only it can
+    /// compile against the net8.0 build of Microsoft.Extensions.Caching.Memory, or below C# 10,
+    /// and then keeps the string key lookup. See #185.
     /// </summary>
     private static bool IsSpanKeyLookupAvailable(Compilation compilation, ParseOptions options)
     {

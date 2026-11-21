@@ -11,7 +11,7 @@ Put `[Cache]` on an interface and a source generator writes the caching proxy fo
 
 ## Why ZeroAlloc.Cache
 
-- **0 B per cache hit.** A `ValueTask<T>` hit on the default `MemoryCache` on .NET 9 and later allocates nothing, and a test fails the build if it ever does. The few cases that still allocate are [listed](https://github.com/ZeroAlloc-Net/ZeroAlloc.Cache/blob/main/docs/performance.md#where-a-hit-still-allocates).
+- **0 B per cache hit.** A `ValueTask<T>` hit on the default `MemoryCache` allocates nothing, and a test fails the build if it ever does. The few cases that still allocate are [listed](https://github.com/ZeroAlloc-Net/ZeroAlloc.Cache/blob/main/docs/performance.md#where-a-hit-still-allocates).
 - **About 4× faster than FusionCache** on an in-process cache hit, measured in the same run.
 - **Works under NativeAOT and trimming.** The proxy is plain generated code, published and run as a NativeAOT app in CI.
 - **Mistakes surface at compile time.** Unstable key parameters, a missing `HybridCache` package or a missing AOT serializer are compiler diagnostics, not production surprises.
@@ -21,6 +21,8 @@ Put `[Cache]` on an interface and a source generator writes the caching proxy fo
 ```bash
 dotnet add package ZeroAlloc.Cache
 ```
+
+The package targets `net10.0` and `net11.0`. Version 1.x also shipped `net8.0` and `net9.0` builds.
 
 ## Quick start
 

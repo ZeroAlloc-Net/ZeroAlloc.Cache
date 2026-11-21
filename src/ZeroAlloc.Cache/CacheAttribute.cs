@@ -20,7 +20,7 @@ public sealed class CacheAttribute : Attribute
 
     /// <summary>
     /// When true, the proxy uses HybridCache (L1 + optional L2) instead of IMemoryCache.
-    /// Requires Microsoft.Extensions.Caching.Hybrid and .NET 9+ or the NuGet backport.
+    /// Requires a HybridCache registered in DI, for example with AddHybridCache().
     /// </summary>
     public bool UseHybridCache { get; init; } = false;
 }
