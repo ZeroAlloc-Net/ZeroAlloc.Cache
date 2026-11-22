@@ -59,6 +59,20 @@ grep -E 'warning IL[0-9]{4}' publish.log \
 
 Any output is a failure.
 
+CI job `sdk10-consumer` needs a 10.0.1xx SDK; `tests/ZeroAlloc.Cache.Sdk10Smoke/global.json` pins
+10.0.100 with `rollForward: latestPatch`, so a newer band cannot stand in for it. It builds and runs a
+consumer of the packed package with Roslyn 5.0:
+
+```bash
+v=9.9.9-local.sha$(git rev-parse --short HEAD).$(date +%s)
+dotnet pack src/ZeroAlloc.Cache -c Release -o artifacts -p:Version="$v"
+cd tests/ZeroAlloc.Cache.Sdk10Smoke/Consumer
+dotnet run -c Release -p:ZeroAllocCacheVersion="$v"
+```
+
+CI job `roslyn-floor` calls the shared `roslyn-floor.yml` from ZeroAlloc-Net/.github: it packs the
+solution and fails when a packed DLL references Roslyn above 5.0.0.
+
 Fast inner loop (verified, runs in about a minute, not a CI job on its own):
 
 ```bash
@@ -66,6 +80,11 @@ dotnet test tests/ZeroAlloc.Cache.Generator.Tests -c Release -f net10.0
 ```
 
 ## Conventions and gotchas
+- The generator references `Microsoft.CodeAnalysis.CSharp` 5.0.0, the compiler of SDK band 10.0.1xx, the
+  oldest supported SDK. A compiler older than the Roslyn it references skips it with `CS9057`, and
+  nothing is generated. The shared Renovate preset holds it below 5.1. If a newer Roslyn API is needed,
+  change the code; raise the floor only together with the minimum SDK. Test projects may use a newer
+  Roslyn.
 
 - Warnings are errors, and `RS0016` and `RS0017` too. A public API change needs a matching entry in
   `src/ZeroAlloc.Cache/PublicAPI.Unshipped.txt`. A new or changed `ZC` diagnostic needs
