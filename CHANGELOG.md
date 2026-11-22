@@ -4,6 +4,25 @@ All notable changes to this project are documented here. The format is based on
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the project follows
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.0.0](https://github.com/ZeroAlloc-Net/ZeroAlloc.Cache/compare/v1.3.5...v2.0.0) (2026-11-21)
+
+
+### ⚠ BREAKING CHANGES
+
+* net8.0 and net9.0 assets are no longer shipped; ZC0006, ZC0007 and ZC0008 are now errors. See the Behaviour change section of the pull request for migration steps.
+
+### Features
+
+* target net10.0 and net11.0, drop net8.0 and net9.0 ([2b5f2cf](https://github.com/ZeroAlloc-Net/ZeroAlloc.Cache/commit/2b5f2cfa52c86bff6f05d3501593e4d018afb2c8))
+
+
+### Bug Fixes
+
+* drop the net9.0 target advice from the ZC0003 message ([2b5f2cf](https://github.com/ZeroAlloc-Net/ZeroAlloc.Cache/commit/2b5f2cfa52c86bff6f05d3501593e4d018afb2c8))
+* report ZC0006 as an error when a containing type of the interface is not partial ([2b5f2cf](https://github.com/ZeroAlloc-Net/ZeroAlloc.Cache/commit/2b5f2cfa52c86bff6f05d3501593e4d018afb2c8))
+* report ZC0007 as an error when the interface is generic or nested in a generic type ([2b5f2cf](https://github.com/ZeroAlloc-Net/ZeroAlloc.Cache/commit/2b5f2cfa52c86bff6f05d3501593e4d018afb2c8))
+* report ZC0008 as an error when the interface is private or protected, or nested in such a type ([2b5f2cf](https://github.com/ZeroAlloc-Net/ZeroAlloc.Cache/commit/2b5f2cfa52c86bff6f05d3501593e4d018afb2c8))
+
 ## [1.3.5](https://github.com/ZeroAlloc-Net/ZeroAlloc.Cache/compare/v1.3.4...v1.3.5) (2026-11-16)
 
 
